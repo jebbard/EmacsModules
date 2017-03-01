@@ -476,32 +476,55 @@ color could not be identified (e.g. during typing)."
 (defun moin--setup-key-bindings ()
   "Installs all key bindings"
 
-  ;; ;; Headline motion redefined to org key-bindings
-  ;; (define-key moin-mode-map (kbd "C-c C-n") 'outline-next-visible-heading)
-  ;; (define-key moin-mode-map (kbd "C-c C-p") 'outline-previous-visible-heading)
-  ;; (define-key moin-mode-map (kbd "C-c C-f") 'outline-forward-same-level)
-  ;; (define-key moin-mode-map (kbd "C-c C-b") 'outline-backward-same-level)
-  ;; (define-key moin-mode-map (kbd "C-c C-u") 'outline-up-heading)
-
-  ;; ;; Structure editing redefined to org key-bindings or reassociated
-  ;; (define-key moin-mode-map (kbd "C-c @") 'outline-mark-subtree)
-  ;; ;; TODO: The following two commands sometimes do not work as expected...
-  ;; (global-set-key [M-S-up] 'moin-command-meta-shift-up)
-  (define-key moin-mode-map [M-S-up] 'moin-command-meta-shift-up)
-  ;; (define-key moin-mode-map (kbd "M-S-<down>") 'outline-move-subtree-down)
-  ;; (define-key moin-mode-map [M-up] 'moin-command-meta-shift-up)
-
-  ;; (let ((map outline-mode-map))
-  ;; (define-key map (kbd "M-S-<up>") 'moin-command-meta-shift-up)
-  ;;   )
+  ;; Structure editing redefined to org key-bindings or reassociated
+  (define-key moin-mode-map (kbd "M-S-<down>") 'outline-move-subtree-down)
+  (define-key moin-mode-map (kbd "M-<down>") 'outline-move-subtree-down)
+  (define-key moin-mode-map (kbd "M-S-<up>") 'outline-move-subtree-up)
+  (define-key moin-mode-map (kbd "M-<up>") 'outline-move-subtree-up)
 
   ;; Visibility cycling
-  (when (require 'outshine nil t)
-    (define-key moin-mode-map [tab] 'moin-command-outline-cycle))
+  (define-key moin-mode-map [tab] 'moin-command-outline-cycle))
 
-  
+(defun moin--determine-heading-level()
+  (save-excursion
+    (beginning-of-line)
+    (looking-at "\\(=+\\) ")
+    (setq len (length (match-string 1)))
+    len))
 
-  )
+(defun moin--determine-heading-folding-state()
+  "Determins the state of folding of the current heading. This function assumes
+that the point is currently on a heading line. 
+The states are:
+ * FOLDED: Hides the entire subtree and content of the current heading
+ * CHILDREN: Shows the content of the current heading and all direct child 
+headings of the next lower level below the current heading. The child heading
+subtrees remain hidden.
+ * SUBTREE: The entire content and subtree below the current heading is 
+shown entirely, no folding"
+  ;; Current headline is FOLDED
+  (if (invisible-p (point-at-eol))
+      "FOLDED"
+    ; else
+    (save-excursion
+
+      (setq current-heading-level (moin--determine-heading-level))
+
+      ; Set point to next heading (no matter if visible or not)
+      (outline-next-heading)
+      
+      (if (moin-is-on-heading-p)
+	  (progn 
+	    (setq next-heading-level (moin--determine-heading-level)))
+	; else
+	(setq next-heading-level 0))
+
+      ; Current heading has children
+      (if (and (eq (+ current-heading-level 1) next-heading-level)
+	       (invisible-p (point-at-eol)))
+	  (progn "CHILDREN")
+	; else
+	"SUBTREE"))))
 
 ;; ==================================================
 ;; Functions
@@ -509,9 +532,6 @@ color could not be identified (e.g. during typing)."
 (defun moin-is-on-heading-p ()
   "Is point on a header line?"
   (outline-on-heading-p))
-;  (save-excursion
-;    (beginning-of-line)
-;    (looking-at "=+ \\(.*\\) =+$")))
 
 
 ;; ==================================================
@@ -519,12 +539,30 @@ color could not be identified (e.g. during typing)."
 
 (defun moin-command-outline-cycle ()
   "Cycles the current heading level between three states, if point is 
-currently located on a heading, otherwise delegates to the global binding"
+currently located on a heading, otherwise delegates to the global binding. 
+The states are:
+ * FOLDED: Hides the entire subtree and content of the current heading
+ * CHILDREN: Shows the content of the current heading and all direct child 
+headings of the next lower level below the current heading. The child heading
+subtrees remain hidden.
+ * SUBTREE: The entire content and subtree below the current heading is 
+shown entirely, no folding"
   (interactive)
   (if (moin-is-on-heading-p)
-      (progn (outline-cycle))
+      (progn
+	(setq folding-state (moin--determine-heading-folding-state))
+	;(message "FOLDING state: %s" folding-state)
+	
+        (cond ((string= "FOLDED" folding-state)
+	       (show-entry)
+	       (show-children))
+	      ((string= "CHILDREN" folding-state)
+	       (show-subtree))
+	      ((string= "SUBTREE" folding-state)
+	       (hide-subtree))))
     ; else
-      (call-interactively (global-key-binding "\t"))))
+    (call-interactively (global-key-binding "\t"))))
+
 
 (defun moin-command-meta-shift-up ()
   "Meta command that performs different functions based on the context:
@@ -534,24 +572,21 @@ as `outline-move-subtree-up', but without bugs.
 * If point is currently in a list, TODO.
 "
   (interactive)
-  (if (moin-is-on-heading-p)
-      (progn (outline-cycle))
-      ; else
-      (error "Point is currently not on a heading, in a table or in a list")
-    ))
+      (error "Not yet implemented")
+    )
 
 ;; ==================================================
 ;; Major mode definition
 
-(define-derived-mode moin-mode text-mode "moin"
+(define-derived-mode moin-mode outline-mode "moin"
   "Set major mode for editing MoinMoin pages"
-  (outline-minor-mode)
+;  (outline-minor-mode)
   
   ; Preparations for outline minor mode
   (make-local-variable 'outline-regexp)
   (setq outline-regexp "=+ ")
   (make-local-variable 'outline-heading-end-regexp)
-  (setq outline-heading-end-regexp " =+$")
+  (setq outline-heading-end-regexp " ==*$")
   ; Setup related modes
   (toggle-truncate-lines 0)
   (visual-line-mode 1)
