@@ -88,6 +88,11 @@
 ;; - Fixed some issues with syntax highlighting (errors in *messages*)
 ;; - Updated outline cycle to also work for headings without any content
 ;; - Implemented moving of subtrees for headings (up and down)
+;; v0.3    2017-03-23  Jens Ebert            <jensebert@gmx.net>
+;; - Fixed issue with italic syntax highlighting
+;; - Implemented promotion and demotion of subtrees
+;; - Updated outline cycle to also work in a special case of sub-headings
+;;   without content
 
 ;;; Code:
 ;; ==================================================
@@ -121,9 +126,10 @@ of tables, set to nil otherwise. Default is t"
 
 
 ;; ==================================================
-;; Buffer local variables
+;; Constants
 
-;; NONE yet
+(defconst moin-const-max-heading-level 5
+  "The maximum level of a heading in MoinMoin")
 
 ;; ==================================================
 ;; Face definitions
@@ -348,7 +354,7 @@ color could not be identified (e.g. during typing)."
      ("\\('''.*?'''\\)"
       (1 'moin-face-bold prepend))
      ;; Italic
-     ("[^']+\\(''[^']*?''\\)[^']+"
+     ("[^']\\(''[^']*?''\\)[^']"
       (1 'moin-face-italic prepend))
      ;; Underline
      ("\\(__.*?__\\)"
@@ -501,12 +507,30 @@ color could not be identified (e.g. during typing)."
   (define-key moin-mode-map [tab] 'moin-command-tab)
   (define-key moin-mode-map (kbd "S-<tab>") 'moin-command-table-previous-field))
 
+
+(defun moin--get-heading-content()
+  "Gets the content of the current heading"
+  (beginning-of-line)
+  (looking-at "=*? \\(.*\\) =")
+  (setq heading-content (match-string 1)))
+
+
+(defun moin--fix-heading(heading-level heading-diff)
+  "Fix end of heading, essentially adds on '=' to well-formed headings,
+and fixes any errors on the end of heading"
+  (re-search-forward "[ \t =]*$")
+  (replace-match (concat " " (make-string (+ current-level heading-diff) ?=))))
+
+
 (defun moin--determine-heading-level()
+  "Determines the level of the current heading, if any. Returns 0 if currently not
+on a heading"
   (save-excursion
     (beginning-of-line)
     (looking-at "\\(=+\\) ")
     (setq len (length (match-string 1)))
     len))
+
 
 (defun moin--determine-heading-folding-state()
   "Determins the state of folding of the current heading. This function assumes
@@ -520,28 +544,39 @@ subtrees remain hidden.
 shown entirely, no folding"
   ;; Current headline is FOLDED
   ; Second part of or is necessary for headings without any content
-  (if (or (invisible-p (point-at-eol)) (invisible-p (- (point-at-eol) 1)))
+  (if (invisible-p (point-at-eol))
       "FOLDED"
-    ; else
+    ;; else
     (save-excursion
 
       (setq current-heading-level (moin--determine-heading-level))
 
-      ; Set point to next heading (no matter if visible or not)
-      (outline-next-heading)
+      ;; Check whether at least one direct child heading has an invisible body
+      (setq is-child-heading t)
+      (setq has-folded-children nil)
       
-      (if (moin-is-on-heading-p)
-	  (progn 
-	    (setq next-heading-level (moin--determine-heading-level)))
-	; else
-	(setq next-heading-level 0))
+      (while (and is-child-heading (not has-folded-children))
+	(progn
+	  (message "FUCKING cycle")
+	  ;; Set point to next heading (no matter if visible or not)
+	  (outline-next-heading)
+	  
+	  (if (moin-is-on-heading-p)
+	      (progn 
+		(setq next-heading-level (moin--determine-heading-level)))
+	    ;; else
+	    (setq next-heading-level 0))
 
-      ; Current heading has children
-      (if (and (eq (+ current-heading-level 1) next-heading-level)
-	       (invisible-p (point-at-eol)))
+	  ;; Current heading has children
+	  (if (eq (+ current-heading-level 1) next-heading-level)
+	      (if (invisible-p (point-at-eol))
+		  (setq has-folded-children t))
+	    (setq is-child-heading nil))))
+
+      (if has-folded-children
 	  (progn "CHILDREN")
-	; else
 	"SUBTREE"))))
+
 
 (defun moin--move-subtree-down (&optional arg)
   "Move the current subtree down past ARG headlines of the same level.
@@ -589,21 +624,81 @@ bugfix code if emacs major version is < 25."
     (outline-move-subtree-dowh arg)))
 
 
+(defun moin--execute-action-on-subtree (action &optional initial-level curr-level)
+  "Executes a given action on the whole subtree of the current heading, including the current
+heading itself. The function sets point to the start of each of the headings belonging to the
+subtree of the current heading. Must be called only if point is currently on a heading."
+  (if (not (moin-is-on-heading-p))
+      (user-error "Only working on a heading"))
+  (save-excursion
+    (beginning-of-line)
+    ;; Get level of current heading
+    (if (not curr-level)
+	(setq current-heading-level (moin--determine-heading-level))
+      (setq current-heading-level curr-level))
+
+    (if (not initial-level)
+	(setq initial-level current-heading-level))
+    
+    (funcall action current-heading-level)
+
+    ;; Set point to next heading (no matter if visible or not)
+    (outline-next-heading)
+    
+    (if (moin-is-on-heading-p)
+	(progn 
+	  (setq next-heading-level (moin--determine-heading-level)))
+      ;; else
+      (setq next-heading-level 0))
+
+    ;; Real child found
+    (if (> next-heading-level initial-level)
+	(progn
+	  (moin--execute-action-on-subtree action initial-level next-heading-level)))))
+
+
+(defun moin--do-demote(current-level)
+  "Performs actual demotion of the current heading"
+  (if (= current-level moin-const-max-heading-level)
+      (user-error "Cannot demote heading '%s', because it is already on maximum level %s"
+		  (moin--get-heading-content) moin-const-max-heading-level)
+    ;; else
+    (outline-demote nil)
+    (moin--fix-heading current-level +1)))
+
+
+(defun moin--do-promote(current-level)
+  "Performs actual promotion of the current heading"
+  (if (= current-level 1)
+      (user-error "Cannot promote heading '%s', because it is already on minimum level 1"
+		  (moin--get-heading-content))
+    ;; else
+    (outline-promote nil)
+    (moin--fix-heading current-level -1)))
+
+
+(defun moin--change-heading-level (change-func including-subtree)
+  "Promotes or demotes the current heading (depending on the change-func provided), 
+either with or without subtree. This function was created to also take care of the 
+special characteristics of MoinMoin headings: They are enclosed by '=' signs. 
+Unfortunately, outline-mode does not support this, i.e. it only demotes the 
+prefix of the heading, leaving the suffix unchanged. Thus, moin-mode itself needs 
+to take care of also demoting or promoting the rest of the heading."
+  (save-excursion
+    (if mark-active
+	(user-error "Command not supported if mark is active"))
+    (if including-subtree
+	(moin--execute-action-on-subtree change-func)
+      (setq current-heading-level (moin--determine-heading-level))
+      (funcall change-func current-heading-level))))
+
+
 (defun moin--outline-cycle (&optional arg)
-  "Cycles the current heading level between three states, if point is 
-currently located on a heading, otherwise delegates to the global binding. 
-The states are:
- * FOLDED: Hides the entire subtree and content of the current heading
- * CHILDREN: Shows the content of the current heading and all direct child 
-headings of the next lower level below the current heading. The child heading
-subtrees remain hidden.
- * SUBTREE: The entire content and subtree below the current heading is 
-shown entirely, no folding"
+  "Implements outline cycle, see `' for more details."
   (interactive "p")
   (if (moin-is-on-heading-p)
       (progn
 	(setq folding-state (moin--determine-heading-folding-state))
-	;(message "FOLDING state: %s" folding-state)
 	
         (cond ((string= "FOLDED" folding-state)
 	       (show-entry)
@@ -614,9 +709,8 @@ shown entirely, no folding"
 	       (message "SUBTREE"))
 	      ((string= "SUBTREE" folding-state)
 	       (hide-subtree)
-	       (message "FOLDED"))))
-    ; else
-    (call-interactively (global-key-binding "\t"))))
+	       (message "FOLDED"))))))
+
 
 ;; ==================================================
 ;; Functions
@@ -723,7 +817,9 @@ with next row), if it is not already the last row in the table."
 context:
 * If point is currently on a heading, it promotes the current subtree (i.e.
 the current heading and all its children), if the current heading is not
-already on level 1. 
+already on level 1. This command does not work with an active mark is active,
+which will lead to an error message. It also fixes errors in the end marker 
+of the heading, if necessary.
 * If point is currently in a table, it removes the current column of the
 table.
 * If point is currently in a list, it decreases the indentation of the
@@ -731,7 +827,12 @@ current item with its subtree (i.e. all its children). A subtree's indentation
 can only be decreased if it is not already on the left-most indentation level of 
 the list."
   (interactive "p")
-  (moin-command-meta-shift-right  (- arg)))
+  (if (moin-is-on-heading-p)
+      (moin--change-heading-level 'moin--do-promote t)
+    (if (moin-is-in-list-p)
+	(user-error "Not implemented yet for lists!")
+      (if (moin-is-in-table-p)
+	  (user-error "Not implemented yet for tables!")))))
 
 
 (defun moin-command-meta-shift-right (&optional arg)
@@ -739,7 +840,9 @@ the list."
 context:
 * If point is currently on a heading, it demotes the current subtree (i.e.
 the current heading and all its children), if the current heading is not
-already on level 5. 
+already on level 5. This command does not work with an active mark is active,
+which will lead to an error message. It also fixes errors in the end marker 
+of the heading, if necessary.
 * If point is currently in a table, it inserts a new empty column to the 
 left of point.
 * If point is currently in a list, it increases the indentation of the
@@ -747,7 +850,7 @@ current item with its subtree (i.e. all its children). An item's indentation
 can only be increased if it is not the first item below its parent."
   (interactive "p")
   (if (moin-is-on-heading-p)
-      (user-error "Not implemented yet for headings!")
+      (moin--change-heading-level 'moin--do-demote t)
     (if (moin-is-in-list-p)
 	(user-error "Not implemented yet for lists!")
       (if (moin-is-in-table-p)
@@ -759,6 +862,9 @@ can only be increased if it is not the first item below its parent."
 context:
 * If point is currently on a heading, it demotes the current heading, leaving
 its children unchanged, but only if the current heading is not already on level 1. 
+This command does not work with an active mark is active,
+which will lead to an error message. It also fixes errors in the end marker 
+of the heading, if necessary.
 * If point is currently in a table, it moves the current column of the
 table to the left, but only if it is not already the left-most column.
 * If point is currently in a list, it decreases the indentation, leaving its
@@ -766,7 +872,12 @@ children unchanged. A single item's indentation can only be decreased if it is
 not already on the left-most indentation level of the list. Furthermore, if the
 item has children, its indentation can only be decreased by one."
   (interactive "p")
-  (moin-command-meta-right  (- arg)))
+  (if (moin-is-on-heading-p)
+      (moin--change-heading-level 'moin--do-promote nil)
+    (if (moin-is-in-list-p)
+	(user-error "Not implemented yet for lists!")
+      (if (moin-is-in-table-p)
+	  (user-error "Not implemented yet for tables!")))))
 
 
 (defun moin-command-meta-right (&optional arg)
@@ -774,6 +885,9 @@ item has children, its indentation can only be decreased by one."
 context:
 * If point is currently on a heading, it promotes the current heading, leaving
 its children unchanged, but only if the current heading is not already on level 5. 
+This command does not work with an active mark is active,
+which will lead to an error message. It also fixes errors in the end marker 
+of the heading, if necessary.
 * If point is currently in a table, it moves the current column of the
 table to the right, but only if it is not already the right-most column.
 * If point is currently in a list, it increases the indentation, leaving its
@@ -781,7 +895,7 @@ children unchanged. An item's indentation can only be increased if it is not the
 first item below its parent."
   (interactive "p")
   (if (moin-is-on-heading-p)
-      (user-error "Not implemented yet for headings!")
+      (moin--change-heading-level 'moin--do-demote nil)
     (if (moin-is-in-list-p)
 	(user-error "Not implemented yet for lists!")
       (if (moin-is-in-table-p)
@@ -859,13 +973,21 @@ or to the first field of the next row, if the current field is in the last
 column of the table. If the current field is the last field of the table
 in the right-most column, this command will create a new empty row and put
 point into the left-most field of the new row.
-* If point is currently on a heading, it performs visibility cycling, see
-`moin--outline-cycle' for more details. "
+* If point is currently on a heading, it performs visibility cycling. It 
+cycles the current heading level between three states:
+ * FOLDED: Hides the entire subtree and content of the current heading
+ * CHILDREN: Shows the content of the current heading and all direct child 
+headings of the next lower level below the current heading. The child heading
+subtrees remain hidden.
+ * SUBTREE: The entire content and subtree below the current heading is 
+shown entirely, no folding.
+* Otherwise delegates to the global binding for TAB."
   (interactive "p")
   (if (moin-is-on-heading-p)
       (moin--outline-cycle arg)
     (if (moin-is-in-table-p)
-	(user-error "Not implemented yet for tables!"))))
+	(user-error "Not implemented yet for tables!")
+      (call-interactively (global-key-binding "\t")))))
 
 ;; ==================================================
 ;; Major mode definition
@@ -877,15 +999,12 @@ point into the left-most field of the new row.
   ; Preparations for outline minor mode
   (make-local-variable 'outline-regexp)
   (setq outline-regexp "=+ ")
-  (make-local-variable 'outline-heading-end-regexp)
-  (setq outline-heading-end-regexp " ==*$")
   ; Setup related modes
   (toggle-truncate-lines 0)
   (visual-line-mode 1)
   ; Setup moin internal data
   (moin--setup-key-bindings)
-  (moin--setup-font-lock)
-  )
+  (moin--setup-font-lock))
 
 ;; This is the default naming of revision files for moin moin
 ;; wiki articles, when saved in file system

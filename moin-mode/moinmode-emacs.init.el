@@ -5,13 +5,11 @@
 (add-to-list 'load-path OUTSHINE_DIR)
 (add-to-list 'load-path OUTORG_DIR)
 
-(defconst MODULES_DIR "E:/Programmieren/Planung/")
-
-(defconst OWN_MODULES_DIR (concat MODULES_DIR "ownModules/"))
-(add-to-list 'load-path OWN_MODULES_DIR)
+(defconst MODULES_DIR "E:/Daten/Repositories/EmacsModules/moin-mode/")
+(add-to-list 'load-path MODULES_DIR)
 
 (require 'moin-mode)
-(add-to-list 'auto-mode-alist '(".*test\\'" . moin-mode))
+(add-to-list 'auto-mode-alist '(".*txt\\'" . moin-mode))
 
 (setq inhibit-startup-screen t)
 

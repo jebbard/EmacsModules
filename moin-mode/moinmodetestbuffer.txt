@@ -26,7 +26,7 @@ start ~-s-~maller   end
 start ~+L+~arger    end
 start ^S^uperscript end
 start ,,S,,ubscript end
-== Level 2 Heading: Table with formatting ==
+== Level 2 Heading with WikiWord: Table with formatting ==
 
 ||<rowbgcolor="#AAAAAA"> no formatting ||<|4> Hallo ''italic'' huhu	  ||
 || no formatting || '''bold'''	  ||
@@ -79,12 +79,17 @@ Code wrapped with processing instruction (1) (four braces)
 }}}}
 
 {{{{#!wiki caution
-Code wrapped with processing instruction (2) (four braces)
+Code wrapped with processing instruction (2) (four braces) WikiWord
 }}}}
 
 {{{{#!wiki lightgoldenrodyellow/dotted
 Code wrapped with processing instruction (3) (four braces)
 }}}}
+
+Ein anderes Beispiel:
+{{{#!wiki yellow/dotted
+'''ACHTUNG''': In Eclipse dient "Synchronize with Repository" dazu, den lokalen Stand mit dem zentralen Repository-Stand abzugleichen. Nutzt man Tortoise SVN im Windows-Explorer, darf man ''nicht'' dem Missverständnis erliegen, dass "Check for modifications" dem "Synchronize with Repository" entspricht! Check for modifications funktioniert anders: Es vergleicht die lokalen Änderungen mit dem lokal in den .svn-Ordnern vorgehaltenen Stan des ''letzten Checkouts oder Updates'', mit dem sogenannten "text base". Man sieht also erstmal ''keinerlei'' entfernte Änderungen. Erst wenn man im aufpoppenden Dialog noch auf "Check repository" klickt, wird ein Abgleich mit dem fernen Repository gemacht!
+}}}
 
 == Level 2 Heading: Links ==
 
@@ -98,9 +103,9 @@ Explicit global link, no text: [[http://www.google.com]]
 
 Explicit global link, with text: [[https://www.google.de| mein Text hier]]
 
-In-Wiki-Link, no text: [[Start/MyWiki/ALink/To/Somewhere/Else]]
-In-Wiki-Link, with text: [[Start/MyWiki/ALink/To/Somewhere/Else|Some Text]]
-Relative wiki link with text [[../anyLink/ToAnyWhere|the text]]
+In-Wiki-Link, no text and Wikiword: [[Start/MyWiki/ALink/To/Somewhere/Else]]
+In-Wiki-Link, with text and Wikiword: [[Start/MyWiki/ALink/To/Somewhere/Else|Some Text]]
+Relative wiki link with text and Wikiword [[../anyLink/ToAnyWhere|the text]]
 
 == Level 2 Heading: Embedding ==
 
@@ -137,3 +142,28 @@ WikiWord
 No !WikiWord
 
 A FourElementWikiWord in the middle of the line
+
+A list:
+ * asdas
+ . asdsa
+ .
+   * next level
+   1. ha
+   A.
+   q.
+   i.
+   I.
+                  .
+		  1.
+No List:
+ 1
+ A
+ b
+ i
+ I
+ 2
+*
+.
+A.
+i.
+I.
