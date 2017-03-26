@@ -1,3 +1,4 @@
+;;; moin-mode.el --- Major mode and command definition for MoinMoin (main file)
 
 ;; Copyright (C) 2017 Jens Ebert
 
@@ -5,7 +6,7 @@
 ;; Maintainer: Jens Ebert <jensebert@gmx.net>
 ;; Created: 20 Jan 2017
 ;; Keywords: wiki editing
-;; Version: 0.1
+;; Version: 0.4
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -40,8 +41,8 @@
 ;;
 ;; Installation:
 ;; -------------
-;; * Ensure the file `moin-mode.el' is located in Emacs load
-;; path, if this is not the case, use `add-to-list' in your Emacs
+;; * Ensure the file `moin-mode.el' and all its accompanying files are located
+;; in Emacs load path, if this is not the case, use `add-to-list' in your Emacs
 ;; initialization file, e.g. to .emacs:
 ;;   (add-to-list 'load-path /my/dir)
 ;; * Add the following line to your Emacs initialization file:
@@ -67,9 +68,10 @@
 ;; * Emacs: 24.5
 ;; * MoinMoin: 1.9.x
 ;;
-;; Improvements:
-;; -------------
-;; * TBD
+;; Improvements/Known issues:
+;; -------------------------
+;; * WikiWords are also highlighted in headings, links and environments
+;; * Syntax highlighting of multiline environments sometimes does not work
 ::
 ;; If you have any further suggestions for improvements or enhancements,
 ;; please mail to <jensebert@gmx.net>
@@ -93,12 +95,18 @@
 ;; - Implemented promotion and demotion of subtrees
 ;; - Updated outline cycle to also work in a special case of sub-headings
 ;;   without content
+;; v0.4    2017-03-26  Jens Ebert            <jensebert@gmx.net>
+;; - Implemented creation of new headings
+;; - Modularization of moin-mode
 
 ;;; Code:
 ;; ==================================================
 ;; Required mandatory packages
 
-(require 'color)
+(require 'moin-faces)
+(require 'moin-headings)
+(require 'moin-tables)
+(require 'moin-lists)
 
 ;; ==================================================
 ;; Group definitions
@@ -106,383 +114,18 @@
   "Major mode for MoinMoin 1.9.x wiki pages"
   :prefix "moin-")
 
-(defgroup moin-faces nil
-  "Faces used for font-lock in moin-mode"
-  :prefix "moin-face-"
-  :group 'moin)
-
 ;; ==================================================
-;; Customization options
+;; Global customization options
 
-(defcustom moin-highlight-colored-env-p t
-  "Set to t to enable the background color syntax highlighting
-of !#wiki environments, set to nil otherwise. Default is t"
-  :group 'moin)
-
-(defcustom moin-highlight-colored-table-p t
-  "Set to t to enable the background color syntax highlighting
-of tables, set to nil otherwise. Default is t"
-  :group 'moin)
-
+;; None so far - But see individual other modules and docs for other options
 
 ;; ==================================================
 ;; Constants
 
-(defconst moin-const-max-heading-level 5
-  "The maximum level of a heading in MoinMoin")
-
-;; ==================================================
-;; Face definitions
-
-; ------
-; Highlighting Formatted Text
-; -------
-(defface moin-face-bold '((t (:weight bold)))
-  "Face name to use for bold text in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-italic '((t (:slant italic)))
-  "Face name to use for italic text in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-underline '((t (:underline t)))
-  "Face name to use for underlined text in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-stroke '((t (:strike-through t)))
-  "Face name to use for stroked text in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-subscript '((t (:height 0.8)))
-  "Face name to use for subscripts in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-superscript '((t (:height 0.8)))
-  "Face name to use for superscripts in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-monospace '((t (:family "Courier")))
-  "Face name to use for typewriter text in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-larger '((t (:height 1.1)))
-  "Face name to use for larger text in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-smaller '((t (:height 0.9)))
-  "Face name to use for smaller text in moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Tables
-; -------
-(defface moin-face-table-separator
-  '((((class color) (background light)) (:foreground "Blue1"))
-    (((class color) (background dark)) (:foreground "LightSkyBlue")))
-  "Face name to use for separation of columns in tables of moinmoin"
-  :group 'moin-faces)
-(defface moin-face-table-content
-  '((((class color) (background light)) (:foreground "Blue1"))
-    (((class color) (background dark)) (:foreground "LightSkyBlue")))
-  "Face name to use for separation of columns in tables of moinmoin"
-  :group 'moin-faces)
-(defface moin-face-table-processing-instruction
-  '((((class color) (background light)) (:foreground "DarkGray" :weight bold))
-    (((class color) (background dark)) (:foreground "Gray70" :weight bold)))
-  "Face name to use for processing instructions in tables of moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Macros
-; -------
-(defface moin-face-macro-content '((t (:foreground "Dark Blue")))
-  "Face name to use for names of macros in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-macro-braces
-  '((((class color) (background light)) (:foreground "Gray70"))
-    (((class color) (background dark)) (:foreground "DarkGray")))
-  "Face name to use for parameters of macros in moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Embeddings (e.g. attachments)
-; -------
-(defface moin-face-embedding-content '((t (:foreground "Orange")))
-  "Face name to use for names of macros in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-embedding-braces
-  '((((class color) (background light)) (:foreground "Gray70"))
-    (((class color) (background dark)) (:foreground "DarkGray")))
-  "Face name to use for parameters of macros in moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Headings
-; -------
-(defface moin-face-h1
-  '((((class color) (background light)) (:height 1.4 :foreground "Blue1"))
-    (((class color) (background dark)) (:height 1.4 :foreground "LightSkyBlue")))
-  "Face name to use for 1-level headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h2
-  '((((class color) (background light)) (:height 1.3 :foreground "DarkGoldenrod"))
-    (((class color) (background dark)) (:height 1.3 :foreground "LightGoldenrod")))
-  "Face name to use for 2-level headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h3
-  '((((class color) (background light)) (:height 1.2 :foreground "Purple"))
-    (((class color) (background dark)) (:height 1.2 :foreground "Cyan1")))
-  "Face name to use for 3-level headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h4
-  '((((class color) (background light)) (:height 1.1 :foreground "Firebrick"))
-    (((class color) (background dark)) (:height 1.1 :foreground "chocolate1")))
-  "Face name to use for 4-level headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h5
-  '((((class color) (background light)) (:foreground "ForestGreen"))
-    (((class color) (background dark)) (:foreground "PaleGreen")))
-  "Face name to use for 5-level headings in moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Environments
-; -------
-
-(defconst moin-face-env-light-fg "grey30"
-  "The foreground color to use in a code environment in case of light background")
-(defconst moin-face-env-dark-fg "white"
-  "The foreground color to use in a code environment in case of dark background")
-
-(defface moin-face-env
-  '((((class color) (background light)) (:foreground "grey30" :inherit 'moin-face-monospace))
-    (((class color) (background dark)) (:foreground "white" :inherit 'moin-face-monospace)))
-  "Face name to use for code inside braces in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-env-braces
-  '((((class color) (background light)) (:foreground "Gray70"))
-    (((class color) (background dark)) (:foreground "DarkGray")))
-  "Face name to use for baces which delimit environments in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-env-parser '((t (:foreground "plum3" :weight bold)))
-  "Face name to use for parser specs"
-  :group 'moin-faces)
-(defface moin-face-env-usual-bg
-  '((((class color) (background light)) (:background "black" :inherit 'moin-face-monospace))
-    (((class color) (background dark)) (:background "white" :inherit 'moin-face-monospace)))
-  "Face name to use for parser specs"
-  :group 'moin-faces)
-
-; ------
-; Links
-; -------
-(defface moin-face-link
-    '((((class color) (background light)) (:foreground "Purple"))
-      (((class color) (background dark)) (:foreground "Cyan")))
-  "Face name to use for rules in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-email '((t (:inherit 'moin-face-link :underline t)))
-  "Face name to use for emails in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-link-brackets '((t (:inherit 'moin-face-link :weight bold)))
-  "Face name to use for rules in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-followable-link '((t (:inherit 'moin-face-link :underline t)))
-  "Face name to use for rules in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-wiki-word '((t (:foreground "blue4" :weight bold)))
-  "Face name to use for CamelCase links in moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting various other elements
-; -------
-(defface moin-face-rule '((t (:foreground "tomato2" :weight bold)))
-  "Face name to use for rules in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-comment '((t (:foreground "maroon3")))
-  "Face name to use for comments in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-variable '((t (:inherit 'moin-face-monospace)))
-  "Face name to use for code inside braces in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-processing-instruction '((t (:foreground "maroon3")))
-  "Face name to use for comments in moinmoin"
-  :group 'moin-faces)
-
+;; None so far - But see individual other modules and docs for other constants
 
 ;; ==================================================
 ;; "Private" Functions
-(defun moin--create-dynamic-bg-face(bg-color-name)
-  "This function dynamically creates a new face symbol for the given 
-background color name and sets the background color in the returned face.
-It can be used to dynamically change the background color of a piece of 
-fontified buffer based on its contents (e.g. background color of a table based
-on the specified wiki color). It returns a default background color if the given
-color could not be identified (e.g. during typing)."
-  (if (color-defined-p bg-color-name)
-     (progn
-       ; Get the face symbol if already defined before
-       (setq face-symbol (intern-soft bg-color-name))
-
-       ; Or create it newly if it wasn't
-       (if face-symbol nil
-   	(progn
-   	  (setq face-symbol (intern (concat "moin-face-env-" bg-color-name)))))
-  
-       (face-spec-set face-symbol '((t (:inherit 'moin-face-env-usual-bg))))
-
-       (setq rgb-bg-color (color-name-to-rgb bg-color-name))
-       (setq r (car rgb-bg-color))
-       (setq g (car (cdr rgb-bg-color)))
-       (setq b (car (cdr (cdr rgb-bg-color))))
-
-       ; Set the foreground color based on the "darkness" of the bg color
-       (if (> (+ r g b) 1.5)
-          (setq fg-color-name moin-face-env-light-fg)
-   	  (setq fg-color-name moin-face-env-dark-fg))
-      
-       (set-face-background face-symbol bg-color-name)
-       (set-face-foreground face-symbol fg-color-name)
-       ;; Return the newly created face symbol  
-       face-symbol)
-     ;; If no defined color, return the default background color
-     'moin-face-env-usual-bg))
-
-(defun moin--setup-font-lock ()
-  "Installs all font lock patterns for syntax highlighting in their required order"
-  (setq font-lock-multiline t)
-  (make-local-variable 'font-lock-extra-managed-props)
-  (add-to-list 'font-lock-extra-managed-props 'display)
-  (font-lock-add-keywords nil `(
-     ; ------
-     ; Highlighting Formatted Text
-     ; -------
-     ;; Bold
-     ("\\('''.*?'''\\)"
-      (1 'moin-face-bold prepend))
-     ;; Italic
-     ("[^']\\(''[^']*?''\\)[^']"
-      (1 'moin-face-italic prepend))
-     ;; Underline
-     ("\\(__.*?__\\)"
-      (1 'moin-face-underline prepend))
-     ;; Strikethrough
-     ("\\(--(.*?)--\\)"
-      (1 'moin-face-stroke prepend))
-     ;; Subscript
-     ("\\(,,.*?,,\\)"
-      (1 (list 'face 'moin-face-subscript 'display '(raise -0.3)) prepend))
-     ;; Superscript
-     ("\\(\\^.*?\\^\\)"
-      (1 (list 'face 'moin-face-superscript 'display '(raise 0.3)) prepend))
-     ;; Monospace
-     ("\\(`.*?`\\)"
-      (1 'moin-face-monospace prepend))
-     ;; Larger
-     ("\\(~\\+.*?\\+~\\)"
-      (1 'moin-face-larger prepend))
-     ;; Smaller
-     ("\\(~-.*?-~\\)"
-      (1 'moin-face-smaller prepend))
-
-     ; ------
-     ; Highlighting Tables
-     ; -------
-     ;; Table content until next separator
-     ("\\(.*?\\)\\(||\\)"
-      (1 'moin-face-table-content prepend)
-      (2 'moin-face-table-separator))
-     ;; Table processing instruction
-     ("||\\(<.*?>\\)"
-      (1 'moin-face-table-processing-instruction prepend))
-     ;; Table with color spec
-     ("^||<rowbgcolor=\"\\(.*?\\)\">.*$"
-      (0 (when moin-highlight-colored-table-p (moin--create-dynamic-bg-face (match-string 1))) prepend))
-
-     ; ------
-     ; Highlighting Macros
-     ; -------
-     ;; Macro
-     ("\\(<<\\)\\(.*?\\)\\(>>\\)"
-      (1 'moin-face-macro-braces)
-      (2 'moin-face-macro-content prepend)
-      (3 'moin-face-macro-braces))
-
-     ; ------
-     ; Highlighting Embeddings (e.g. Attachment)
-     ; -------
-     ;; Embedding
-     ("\\([^{]{{\\)\\([^{].*?[^}]\\)\\(}}[^}]\\)"
-      (1 'moin-face-embedding-braces)
-      (2 'moin-face-embedding-content prepend)
-      (3 'moin-face-embedding-braces))
-    
-     ; ------
-     ; Highlighting Headings
-     ; -------
-     ("^\\(= .* =\\)$"
-      (1 'moin-face-h1 t))
-     ("^\\(== .* ==\\)$"
-      (1 'moin-face-h2 t))
-     ("^\\(=== .* ===\\)$"
-      (1 'moin-face-h3 t))
-     ("^\\(==== .* ====\\)$"
-      (1 'moin-face-h4 t))
-     ("^\\(===== .* =====\\)$"
-      (1 'moin-face-h5 t))
-    
-     ; ------
-     ; Highlighting Environments
-     ; -------
-     ;; One line & multiline code environments with color spec
-     ("\\({\\{3,4\\}\\)\\(#!wiki \\([a-z]*?\\)/[a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-      (1 'moin-face-env-braces prepend)
-      (2 'moin-face-env-parser prepend)
-      (3 'moin-face-env-parser prepend)
-      (4 'moin-face-env t)
-      (5 'moin-face-env-braces prepend)
-      (0 (when moin-highlight-colored-env-p (moin--create-dynamic-bg-face (match-string 3))) prepend))
-     ;; One line & multiline code environments with other processing instructions
-     ("\\({\\{3,4\\}\\)\\(#![a-z]+ [a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-      (1 'moin-face-env-braces prepend)
-      (2 'moin-face-env-parser prepend)
-      (3 'moin-face-env t)
-      (4 'moin-face-env-braces prepend))
-     ;; One line & multiline code environments without color spec
-     ("\\({\\{3,4\\}\\)\\([^{#][[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-      (1 'moin-face-env-braces prepend)
-      (2 'moin-face-env t)
-      (3 'moin-face-env-braces prepend))
-    
-     ; ------
-     ; Highlighting Links
-     ; -------
-     ;; Freehand absolute URL
-     ("\\(http\\|https\\|ftp\\|nntp\\|news\\|mailto\\|telnet\\|wiki\\|file\\|irc\\)\\(://[A-Za-z0-9_-+&?%#:./=;$]+\\)"
-      (1 'moin-face-followable-link t)
-      (2 'moin-face-followable-link t))
-     ;; EMail
-     ("\\([A-Za-z0-9_+-]+@[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\)"
-      (1 'moin-face-email t))
-     ;; Explicit Link
-     ("\\(\\[\\[\\)\\(.*?\\)\\(\\]\\]\\)"
-      (1 'moin-face-link-brackets t)
-      (2 'moin-face-link keep)
-      (3 'moin-face-link-brackets t))
-     ;; Moin WikiWord    
-     ("\\(?:^\\|[^A-Za-z!]\\)\\(\\(?:\\.\\./\\)?/?[A-Z][a-z]+[A-Z][a-z][A-Za-z]*\\(?:/[A-Z][a-z]+[A-Z][a-z][A-Za-z]*\\)?\\)"
-      (1 'moin-face-wiki-word t))
-    
-     ; ------
-     ; Highlighting various other elements
-     ; -------
-     ;; Horizontal rules
-     ("-\\{4,\\}" (0 'moin-face-rule t))
-     ;; Inline commentsm
-     ("\\(/\\*.*?\\*/\\)"
-      (1 'moin-face-comment t))
-     ;; Variables
-     ("\\(@.*?@\\)"
-      (1 'moin-face-variable t))
-     ;; Processing instructions
-     ("\\(^#.*$\\)"
-      (1 'moin-face-processing-instruction t))
-    ) 'set))
-
-
 (defun moin--setup-key-bindings ()
   "Installs all key bindings"
 
@@ -508,293 +151,22 @@ color could not be identified (e.g. during typing)."
   (define-key moin-mode-map (kbd "S-<tab>") 'moin-command-table-previous-field))
 
 
-(defun moin--get-heading-content()
-  "Gets the content of the current heading"
-  (beginning-of-line)
-  (looking-at "=*? \\(.*\\) =")
-  (setq heading-content (match-string 1)))
-
-
-(defun moin--fix-heading(heading-level heading-diff)
-  "Fix end of heading, essentially adds on '=' to well-formed headings,
-and fixes any errors on the end of heading"
-  (re-search-forward "[ \t =]*$")
-  (replace-match (concat " " (make-string (+ current-level heading-diff) ?=))))
-
-
-(defun moin--determine-heading-level()
-  "Determines the level of the current heading, if any. Returns 0 if currently not
-on a heading"
-  (save-excursion
-    (beginning-of-line)
-    (looking-at "\\(=+\\) ")
-    (setq len (length (match-string 1)))
-    len))
-
-
-(defun moin--determine-heading-folding-state()
-  "Determins the state of folding of the current heading. This function assumes
-that the point is currently on a heading line. 
-The states are:
- * FOLDED: Hides the entire subtree and content of the current heading
- * CHILDREN: Shows the content of the current heading and all direct child 
-headings of the next lower level below the current heading. The child heading
-subtrees remain hidden.
- * SUBTREE: The entire content and subtree below the current heading is 
-shown entirely, no folding"
-  ;; Current headline is FOLDED
-  ; Second part of or is necessary for headings without any content
-  (if (invisible-p (point-at-eol))
-      "FOLDED"
-    ;; else
-    (save-excursion
-
-      (setq current-heading-level (moin--determine-heading-level))
-
-      ;; Check whether at least one direct child heading has an invisible body
-      (setq is-child-heading t)
-      (setq has-folded-children nil)
-      
-      (while (and is-child-heading (not has-folded-children))
-	(progn
-	  ;; Set point to next heading (no matter if visible or not)
-	  (outline-next-heading)
-	  
-	  (if (moin-is-on-heading-p)
-	      (progn 
-		(setq next-heading-level (moin--determine-heading-level)))
-	    ;; else
-	    (setq next-heading-level 0))
-
-	  ;; Current heading has children
-	  (if (eq (+ current-heading-level 1) next-heading-level)
-	      (if (invisible-p (point-at-eol))
-		  (setq has-folded-children t))
-	    (setq is-child-heading nil))))
-
-      (if has-folded-children
-	  (progn "CHILDREN")
-	"SUBTREE"))))
-
-
-(defun moin--move-subtree-down (&optional arg)
-  "Move the current subtree down past ARG headlines of the same level.
-This is a bugfix version of outline-move-subtree-down copied from
-Emacs 25.1, slightly adapted. See GNU Emacs bug#19102. Only uses the 
-bugfix code if emacs major version is < 25."
-  (interactive "p")
-  (if (< emacs-major-version 25)
-     (progn 
-       (outline-back-to-heading)
-       (let* ((movfunc (if (> arg 0) 'outline-get-next-sibling
-			 'outline-get-last-sibling))
-	      ;; Find the end of the subtree to be moved as well as the point to
-	      ;; move it to, adding a newline if necessary, to ensure these points
-	      ;; are at bol on the line below the subtree.
-	      (end-point-func (lambda ()
-				(outline-end-of-subtree)
-				(if (eq (char-after) ?\n) (forward-char 1)
-				  (if (and (eobp) (not (bolp))) (insert "\n")))
-				(point)))
-	      (beg (point))
-	      (folded (save-match-data
-			(outline-end-of-heading)
-			(outline-invisible-p)))
-	      (end (save-match-data
-		     (funcall end-point-func)))
-	      (ins-point (make-marker))
-	      (cnt (abs arg)))
-	 ;; Find insertion point, with error handling.
-	 (goto-char beg)
-	 (while (> cnt 0)
-	   (or (funcall movfunc)
-	       (progn (goto-char beg)
-		      (user-error "Cannot move past superior level")))
-	   (setq cnt (1- cnt)))
-	 (if (> arg 0)
-	     ;; Moving forward - still need to move over subtree.
-	     (funcall end-point-func))
-	 (move-marker ins-point (point))
-	 (insert (delete-and-extract-region beg end))
-	 (goto-char ins-point)
-	 (if folded (hide-subtree))
-	 (move-marker ins-point nil)))
-    ; else if emacs major version >= 25
-    (outline-move-subtree-dowh arg)))
-
-
-(defun moin--execute-action-on-subtree (action &optional initial-level curr-level)
-  "Executes a given action on the whole subtree of the current heading, including the current
-heading itself. The function sets point to the start of each of the headings belonging to the
-subtree of the current heading. Must be called only if point is currently on a heading."
-  (if (not (moin-is-on-heading-p))
-      (user-error "Only working on a heading"))
-  (save-excursion
-    (beginning-of-line)
-    ;; Get level of current heading
-    (if (not curr-level)
-	(setq current-heading-level (moin--determine-heading-level))
-      (setq current-heading-level curr-level))
-
-    (if (not initial-level)
-	(setq initial-level current-heading-level))
-    
-    (funcall action current-heading-level)
-
-    ;; Set point to next heading (no matter if visible or not)
-    (outline-next-heading)
-    
-    (if (moin-is-on-heading-p)
-	(progn 
-	  (setq next-heading-level (moin--determine-heading-level)))
-      ;; else
-      (setq next-heading-level 0))
-
-    ;; Real child found
-    (if (> next-heading-level initial-level)
-	(progn
-	  (moin--execute-action-on-subtree action initial-level next-heading-level)))))
-
-
-(defun moin--do-demote(current-level)
-  "Performs actual demotion of the current heading"
-  (if (= current-level moin-const-max-heading-level)
-      (user-error "Cannot demote heading '%s', because it is already on maximum level %s"
-		  (moin--get-heading-content) moin-const-max-heading-level)
-    ;; else
-    (outline-demote nil)
-    (moin--fix-heading current-level +1)))
-
-
-(defun moin--do-promote(current-level)
-  "Performs actual promotion of the current heading"
-  (if (= current-level 1)
-      (user-error "Cannot promote heading '%s', because it is already on minimum level 1"
-		  (moin--get-heading-content))
-    ;; else
-    (outline-promote nil)
-    (moin--fix-heading current-level -1)))
-
-
-(defun moin--change-heading-level (change-func including-subtree)
-  "Promotes or demotes the current heading (depending on the change-func provided), 
-either with or without subtree. This function was created to also take care of the 
-special characteristics of MoinMoin headings: They are enclosed by '=' signs. 
-Unfortunately, outline-mode does not support this, i.e. it only demotes the 
-prefix of the heading, leaving the suffix unchanged. Thus, moin-mode itself needs 
-to take care of also demoting or promoting the rest of the heading."
-  (save-excursion
-    (if mark-active
-	(user-error "Command not supported if mark is active"))
-    (if including-subtree
-	(moin--execute-action-on-subtree change-func)
-      (setq current-heading-level (moin--determine-heading-level))
-      (funcall change-func current-heading-level))))
-
-
-(defun moin--outline-cycle (&optional arg)
-  "Implements outline cycle, see `' for more details."
-  (interactive "p")
-  (if (moin-is-on-heading-p)
-      (progn
-	(setq folding-state (moin--determine-heading-folding-state))
-	
-        (cond ((string= "FOLDED" folding-state)
-	       (show-entry)
-	       (show-children)
-	       (message "CHILDREN"))
-	      ((string= "CHILDREN" folding-state)
-	       (show-subtree)
-	       (message "SUBTREE"))
-	      ((string= "SUBTREE" folding-state)
-	       (hide-subtree)
-	       (message "FOLDED"))))))
-
-(defun moin--create-new-heading(level &optional text)
-  "Creates a new heading at the current point and positions point
-after the heading prefix"
-  (beginning-of-line)
-  (insert (make-string level ?=))
-  (insert "  ")
-  (insert (make-string level ?=))
-  (newline)
-  (previous-line)
-  (move-to-column (+ level 1))
-  (if text
-      (insert text)))
-
-(defun moin--get-current-heading-level()
-  "Tries to determine the heading level of the current section where point 
-is in. If there is no previous heading, it throws an error."
-  (save-excursion
-    (outline-back-to-heading t)
-    
-    (if (not (moin-is-on-heading-p))
-	(user-error "Point is currently not in a region with a heading"))
-
-    (moin--determine-heading-level)))
-
-(defun moin--insert-heading()
-  "Inserts a new heading before or behind the current one, see 
-`moin-command-meta-return' for details."
-  (if (moin-is-on-heading-p)
-      (progn
-        (setq current-heading-level (moin--determine-heading-level))
-	
-	;; Insert new heading before current one
-	(if (eq (current-column) 0)
-	    (moin--create-new-heading current-heading-level)
-          ;; Insert new heading with no content after current one, if
-	  ;; point is within heading delimiters (at beginning or end)
-	  (progn
-	    (if (or (<= (current-column) (+ current-heading-level 1))
-		    (<= (- (point-at-eol) (point)) (+ current-heading-level 1)))
-		(setq new-heading-text "")
-	      ;; Otherwise just split current heading text to new heading
-	      (progn
-		(setq new-heading-text (buffer-substring (point) (- (point-at-eol) current-heading-level 1)))
-		(delete-region (point) (- (point-at-eol) current-heading-level 1))))
-	    (end-of-line)
-	    (newline)
-	    (moin--create-new-heading current-heading-level new-heading-text))))
-    (progn
-      (setq current-heading-level (moin--get-current-heading-level))
-      (newline)
-      (moin--create-new-heading current-heading-level))))
-
 ;; ==================================================
 ;; Functions
 
 (defun moin-print-object-at-point()
-  "Helper function to check which object is currently at point"
+  "Helper function to check which object is currently at point, just for debbuging purpose"
   (interactive)
-  (if (moin-is-on-heading-p)
-      (message "HEADING")
-    (if (moin-is-in-table-p)
-	(message "TABLE")
-      (if (moin-is-in-list-p)
-	  (message "LIST")
-      (message "NONE")))))
-
-(defun moin-is-on-heading-p ()
-  "Is point on a header line?"
-  (outline-on-heading-p))
-
-(defun moin-is-in-table-p ()
-  "Is point on a table line?"
-  (save-excursion
-    (beginning-of-line)
-    (looking-at "||")))
-
-(defun moin-is-in-list-p ()
-  "Is point on a list line?"
-  (save-excursion
-    (beginning-of-line)
-    (looking-at "\\s-+\\([*.]\\|[1-9A-Za-z]\\.\\)")))
+  (if (moin-is-in-table-p)
+      (message "TABLE")
+    (if (moin-is-in-list-p)
+	(message "LIST")
+      (if (moin-is-on-heading-p)
+	  (message "HEADING")
+	(message "NONE")))))
 
 ;; ==================================================
 ;; Commands
-
 
 (defun moin-command-meta-shift-up (&optional arg)
   "Context-sensitive command that performs different functions based on the
@@ -809,7 +181,12 @@ table.
 subtree up (swapping with previous item), if it is not already the first
 item below its parent item."
   (interactive "p")
-  (moin-command-meta-shift-down  (- arg)))
+  (if (moin-is-in-table-p)
+      (moin--table-remove-row arg)
+    (if (moin-is-in-list-p)
+	(moin--list-move-subtree-up arg)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-move-subtree-up-or-down (- arg))))))
 
 
 (defun moin-command-meta-shift-down (&optional arg)
@@ -825,12 +202,12 @@ current row of the table.
 subtree down (swapping with next item), if it is not already the last
 item below its parent item."
   (interactive "p")
-  (if (moin-is-on-heading-p)
-      (moin--move-subtree-down arg)
+  (if (moin-is-in-table-p)
+      (moin--table-insert-row arg)
     (if (moin-is-in-list-p)
-	(user-error "Not implemented yet for lists!")
-      (if (moin-is-in-table-p)
-	  (user-error "Not implemented yet for tables!")))))
+	(moin--list-move-subtree-down arg)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-move-subtree-up-or-down arg)))))
 
 
 (defun moin-command-meta-up (&optional arg)
@@ -843,10 +220,10 @@ context:
 * If point is currently in a table, it moves the current row up (swapping 
 with previous row), if it is not already the first row in the table."
   (interactive "p")
-  (if (or (moin-is-on-heading-p) (moin-is-in-list-p))
-      (moin-command-meta-shift-up arg)
-    (if (moin-is-in-table-p)
-	(user-error "Not implemented yet for tables!"))))
+  (if (moin-is-in-table-p)
+      (moin--table-move-row-up arg)
+    (if (or (moin-is-in-list-p) (moin-is-on-heading-p))
+	(moin-command-meta-shift-up arg))))
 
 
 (defun moin-command-meta-down (&optional arg)
@@ -859,7 +236,10 @@ context:
 * If point is currently in a table, it moves the current row down (swapping 
 with next row), if it is not already the last row in the table."
   (interactive "p")
-  (moin-command-meta-shift-up  (- arg)))
+  (if (moin-is-in-table-p)
+      (moin--table-move-row-down arg)
+    (if (or (moin-is-in-list-p) (moin-is-on-heading-p))
+	(moin-command-meta-shift-down arg))))
 
 
 (defun moin-command-meta-shift-left (&optional arg)
@@ -877,12 +257,12 @@ current item with its subtree (i.e. all its children). A subtree's indentation
 can only be decreased if it is not already on the left-most indentation level of 
 the list."
   (interactive "p")
-  (if (moin-is-on-heading-p)
-      (moin--change-heading-level 'moin--do-promote t)
+  (if (moin-is-in-table-p)
+      (moin--table-remove-column arg)
     (if (moin-is-in-list-p)
-	(user-error "Not implemented yet for lists!")
-      (if (moin-is-in-table-p)
-	  (user-error "Not implemented yet for tables!")))))
+	(moin--list-outdent-subtree arg)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-change-level 'moin--heading-do-promote t)))))
 
 
 (defun moin-command-meta-shift-right (&optional arg)
@@ -899,12 +279,12 @@ left of point.
 current item with its subtree (i.e. all its children). An item's indentation
 can only be increased if it is not the first item below its parent."
   (interactive "p")
-  (if (moin-is-on-heading-p)
-      (moin--change-heading-level 'moin--do-demote t)
+  (if (moin-is-in-table-p)
+      (moin--table-insert-column arg)
     (if (moin-is-in-list-p)
-	(user-error "Not implemented yet for lists!")
-      (if (moin-is-in-table-p)
-	  (user-error "Not implemented yet for tables!")))))
+	(moin--list-indent-subtree arg)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-change-level 'moin--heading-do-demote t)))))
 
 
 (defun moin-command-meta-left (&optional arg)
@@ -922,12 +302,12 @@ children unchanged. A single item's indentation can only be decreased if it is
 not already on the left-most indentation level of the list. Furthermore, if the
 item has children, its indentation can only be decreased by one."
   (interactive "p")
-  (if (moin-is-on-heading-p)
-      (moin--change-heading-level 'moin--do-promote nil)
+  (if (moin-is-in-table-p)
+      (moin--table-move-column-left arg)
     (if (moin-is-in-list-p)
-	(user-error "Not implemented yet for lists!")
-      (if (moin-is-in-table-p)
-	  (user-error "Not implemented yet for tables!")))))
+	(moin--list-outdent-item arg)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-change-level 'moin--heading-do-promote nil)))))
 
 
 (defun moin-command-meta-right (&optional arg)
@@ -944,20 +324,20 @@ table to the right, but only if it is not already the right-most column.
 children unchanged. An item's indentation can only be increased if it is not the
 first item below its parent."
   (interactive "p")
-  (if (moin-is-on-heading-p)
-      (moin--change-heading-level 'moin--do-demote nil)
+  (if (moin-is-in-table-p)
+      (moin--table-move-column-right arg)
     (if (moin-is-in-list-p)
-	(user-error "Not implemented yet for lists!")
-      (if (moin-is-in-table-p)
-	  (user-error "Not implemented yet for tables!")))))
+	(moin--list-indent-item arg)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-change-level 'moin--heading-do-demote nil)))))
 
 
 (defun moin-command-meta-return (&optional arg)
   "Context-sensitive command that performs different functions based on the
 context:
 * If point is currently in a table, it moves to the next row, splitting 
-the content of the current cell in two parts starting at point, if point
-is currently in the middle of the cell. It creates a new row if point is
+the content of the current field in two parts starting at point, if point
+is currently in the middle of the field. It creates a new row if point is
 currently in the last row. In contrast to org mode, selection or prefix
 arguments are not considered, there is no specific functionality for this.
 * If point is currently in a list, it inserts a new item with the same
@@ -976,42 +356,20 @@ is not in a heading line, the new heading is inserted at point, at the same
 level of the first heading before point. An error message is given if
 there is no heading before point."
   (interactive "p")
-  (if (moin-is-in-list-p)
-      (user-error "Not implemented yet for lists!")
-    (if (moin-is-in-table-p)
-	(user-error "Not implemented yet for tables!")
+  (if (moin-is-in-table-p)
+      (moin--table-next-row-split-field arg)
+    (if (moin-is-in-list-p)
+	(moin--list-insert-item arg)
       ;; else insert a new headline
-      (moin--insert-heading))))
+      (moin--heading-insert arg))))
 
 
 (defun moin-command-insert-heading-respect-content (&optional arg)
   "Inserts a new heading with the same level of the current heading, 
 right after the subtree of the current heading. This also works when only
-in the body of a heading."
+in the body of a heading's section."
   (interactive "p")
-  (setq current-heading-level (moin--get-current-heading-level))
-
-  ;; Check whether at least one direct child heading has an invisible body
-  (setq is-child-heading t)
-  
-  (while is-child-heading
-    (progn
-      ;; Set point to next heading (no matter if visible or not)
-      (outline-next-heading)
-      
-      (if (moin-is-on-heading-p)
-	  (setq next-heading-level (moin--determine-heading-level))
-	;; else
-	(setq next-heading-level 0))
-
-      ;; Current heading has children
-      (if (<= next-heading-level current-heading-level)
-	  (setq is-child-heading nil))))
-
-  (if (eq next-heading-level 0)
-      (end-of-buffer))
-
-  (moin--create-new-heading current-heading-level))
+  (moin--heading-insert-respect-content arg))
 
 
 (defun moin-command-table-next-row (&optional arg)
@@ -1019,22 +377,22 @@ in the body of a heading."
 still does NEWLINE and thus can be used to split a table."
   (interactive "p")
   (if (moin-is-in-table-p)
-      (if (eolp)
-	  (newline)
-	(progn
-	  (user-error "Not implemented yet!")))
-    ; else: Not in table, simply newline
+      (moin--table-next-row arg)
+    ;; else: Not in table, simply newline
     (newline)))
+
 
 (defun moin-command-table-previous-field (&optional arg)
   "When in a table, moves to the previous field, if any. The previous field is
  the field to the left of the current one, or in case that the current field 
 is in the left-most column, the last field of the previous row."
   (interactive "p")
-  ;; It seems impossible to redirect to the mysterious key "S-tab" or also
-  ;; called "<backtab>" or "BACKTAB", so we assume nobody needs this...
   (if (moin-is-in-table-p)
-      (user-error "Not implemented yet!")))
+      (moin--table-previous-field arg))
+  ;; TODO: Redirect to global binding here?
+  ;;(call-interactively (global-key-binding "S-\t"))
+  )
+
 
 (defun moin-command-tab (&optional arg)
   "Context-sensitive command that performs different functions based on the
@@ -1054,11 +412,12 @@ subtrees remain hidden.
 shown entirely, no folding.
 * Otherwise delegates to the global binding for TAB."
   (interactive "p")
-  (if (moin-is-on-heading-p)
-      (moin--outline-cycle arg)
-    (if (moin-is-in-table-p)
-	(user-error "Not implemented yet for tables!")
+  (if (moin-is-in-table-p)
+      (moin--table-next-field arg)
+    (if (moin-is-on-heading-p)
+	(moin--heading-outline-cycle arg)
       (call-interactively (global-key-binding "\t")))))
+
 
 ;; ==================================================
 ;; Major mode definition
