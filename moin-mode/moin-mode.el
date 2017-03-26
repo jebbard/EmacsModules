@@ -557,7 +557,6 @@ shown entirely, no folding"
       
       (while (and is-child-heading (not has-folded-children))
 	(progn
-	  (message "FUCKING cycle")
 	  ;; Set point to next heading (no matter if visible or not)
 	  (outline-next-heading)
 	  
@@ -711,6 +710,57 @@ to take care of also demoting or promoting the rest of the heading."
 	       (hide-subtree)
 	       (message "FOLDED"))))))
 
+(defun moin--create-new-heading(level &optional text)
+  "Creates a new heading at the current point and positions point
+after the heading prefix"
+  (beginning-of-line)
+  (insert (make-string level ?=))
+  (insert "  ")
+  (insert (make-string level ?=))
+  (newline)
+  (previous-line)
+  (move-to-column (+ level 1))
+  (if text
+      (insert text)))
+
+(defun moin--get-current-heading-level()
+  "Tries to determine the heading level of the current section where point 
+is in. If there is no previous heading, it throws an error."
+  (save-excursion
+    (outline-back-to-heading t)
+    
+    (if (not (moin-is-on-heading-p))
+	(user-error "Point is currently not in a region with a heading"))
+
+    (moin--determine-heading-level)))
+
+(defun moin--insert-heading()
+  "Inserts a new heading before or behind the current one, see 
+`moin-command-meta-return' for details."
+  (if (moin-is-on-heading-p)
+      (progn
+        (setq current-heading-level (moin--determine-heading-level))
+	
+	;; Insert new heading before current one
+	(if (eq (current-column) 0)
+	    (moin--create-new-heading current-heading-level)
+          ;; Insert new heading with no content after current one, if
+	  ;; point is within heading delimiters (at beginning or end)
+	  (progn
+	    (if (or (<= (current-column) (+ current-heading-level 1))
+		    (<= (- (point-at-eol) (point)) (+ current-heading-level 1)))
+		(setq new-heading-text "")
+	      ;; Otherwise just split current heading text to new heading
+	      (progn
+		(setq new-heading-text (buffer-substring (point) (- (point-at-eol) current-heading-level 1)))
+		(delete-region (point) (- (point-at-eol) current-heading-level 1))))
+	    (end-of-line)
+	    (newline)
+	    (moin--create-new-heading current-heading-level new-heading-text))))
+    (progn
+      (setq current-heading-level (moin--get-current-heading-level))
+      (newline)
+      (moin--create-new-heading current-heading-level))))
 
 ;; ==================================================
 ;; Functions
@@ -931,8 +981,7 @@ there is no heading before point."
     (if (moin-is-in-table-p)
 	(user-error "Not implemented yet for tables!")
       ;; else insert a new headline
-      (if (moin-is-on-heading-p)
-	(user-error "Not implemented yet for headings!")))))
+      (moin--insert-heading))))
 
 
 (defun moin-command-insert-heading-respect-content (&optional arg)
@@ -940,7 +989,29 @@ there is no heading before point."
 right after the subtree of the current heading. This also works when only
 in the body of a heading."
   (interactive "p")
-  (user-error "Not implemented yet!"))
+  (setq current-heading-level (moin--get-current-heading-level))
+
+  ;; Check whether at least one direct child heading has an invisible body
+  (setq is-child-heading t)
+  
+  (while is-child-heading
+    (progn
+      ;; Set point to next heading (no matter if visible or not)
+      (outline-next-heading)
+      
+      (if (moin-is-on-heading-p)
+	  (setq next-heading-level (moin--determine-heading-level))
+	;; else
+	(setq next-heading-level 0))
+
+      ;; Current heading has children
+      (if (<= next-heading-level current-heading-level)
+	  (setq is-child-heading nil))))
+
+  (if (eq next-heading-level 0)
+      (end-of-buffer))
+
+  (moin--create-new-heading current-heading-level))
 
 
 (defun moin-command-table-next-row (&optional arg)
@@ -994,15 +1065,13 @@ shown entirely, no folding.
 
 (define-derived-mode moin-mode outline-mode "moin"
   "Set major mode for editing MoinMoin pages"
-;  (outline-minor-mode)
-  
-  ; Preparations for outline minor mode
+  ;; Preparations for outline minor mode
   (make-local-variable 'outline-regexp)
   (setq outline-regexp "=+ ")
-  ; Setup related modes
+  ;; Setup related modes
   (toggle-truncate-lines 0)
   (visual-line-mode 1)
-  ; Setup moin internal data
+  ;; Setup moin internal data
   (moin--setup-key-bindings)
   (moin--setup-font-lock))
 
