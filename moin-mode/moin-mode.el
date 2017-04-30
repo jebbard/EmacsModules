@@ -520,7 +520,7 @@ shown entirely, no folding.
   "Set major mode for editing MoinMoin pages"
   ;; Preparations for outline minor mode
   (make-local-variable 'outline-regexp)
-  (setq outline-regexp "=+ ")
+  (setq outline-regexp "=\\{1,5\\} ")
   ;; Setup related modes
   (toggle-truncate-lines 0)
   (visual-line-mode 1)

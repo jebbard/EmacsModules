@@ -46,9 +46,10 @@
 
 (defun moin--heading-determine-content ()
   "Gets the content of the current heading without any prefix or suffix"
-  (beginning-of-line)
-  (looking-at "=*? \\(.*\\) =")
-  (setq heading-content (match-string 1)))
+  (save-excursion
+    (beginning-of-line)
+    (looking-at "=*? \\(.*\\) .*?\\(=\\|$\\)")
+    (setq heading-content (match-string 1))))
 
 
 (defun moin--heading-fix-suffix (updated-heading-level)
@@ -291,7 +292,7 @@ after the heading prefix"
 		(setq new-heading-text "")
 	      ;; Otherwise just split current heading text to new heading
 	      (progn
-		(setq new-heading-text (buffer-substring (point) (- (point-at-eol) current-heading-level 1)))
+		(setq new-heading-text (buffer-substring-no-properties (point) (- (point-at-eol) current-heading-level 1)))
 		(delete-region (point) (- (point-at-eol) current-heading-level 1))))
 	    (end-of-line)
 	    (newline)

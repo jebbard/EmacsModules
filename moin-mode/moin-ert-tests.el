@@ -108,15 +108,15 @@ It expects an error to be thrown."
     
     (should (equal new-formatting-end-point (point)))
     ;; Check text before formatted text - must be unchanged
-    (should (equal (substring text 0 (- formatting-start-point 1)) (buffer-substring 1 formatting-start-point)))
+    (should (equal (substring text 0 (- formatting-start-point 1)) (buffer-substring-no-properties 1 formatting-start-point)))
     ;; Check markup start
-    (should (equal markup (buffer-substring formatting-start-point (+ formatting-start-point markup-len))))
+    (should (equal markup (buffer-substring-no-properties formatting-start-point (+ formatting-start-point markup-len))))
     ;; Check formatted text (within markup) - must be unchanged
-    (should (equal (substring text (- formatting-start-point 1) (- formatting-end-point 1)) (buffer-substring (+ formatting-start-point markup-len)  new-formatting-end-point)))
+    (should (equal (substring text (- formatting-start-point 1) (- formatting-end-point 1)) (buffer-substring-no-properties (+ formatting-start-point markup-len)  new-formatting-end-point)))
     ;; Check markup end
-    (should (equal markup (buffer-substring new-formatting-end-point (+ new-formatting-end-point markup-len))))
+    (should (equal markup (buffer-substring-no-properties new-formatting-end-point (+ new-formatting-end-point markup-len))))
     ;; Check text after formatted text - must be unchanged
-    (should (equal (substring text (- formatting-end-point 1)) (buffer-substring (+ new-formatting-end-point markup-len) (point-at-eol))))))
+    (should (equal (substring text (- formatting-end-point 1)) (buffer-substring-no-properties (+ new-formatting-end-point markup-len) (point-at-eol))))))
 
 
 (ert-deftest test-moin-command-format-bold-error()
@@ -140,7 +140,106 @@ It expects an error to be thrown."
 ;; ==================================================
 ;; Testing heading functions
 
-;; TODO
+
+(ert-deftest test-moin-is-on-heading-p-when-on-heading-line ()
+  "`moin-is-in-heading-p' must return t when point is on a heading line, even if the
+end of the heading line is malformed."
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "= Heading 1 =" t)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "== Heading 2 " t)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "=== Heading 3" t)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "==== Heading 4 =====" t)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "===== Heading 5 =====" t))
+
+
+(ert-deftest test-moin-is-on-heading-p-when-not-on-heading-line ()
+  "`moin-is-in-heading-p' must return nil when point is not on a heading line, especially
+when the heading is of a level bigger than 5."
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "Heading 1 =" nil)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "" nil)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "	 sdf	" nil)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "		" nil)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "====== No Heading anymore =====" nil)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "==Not a Heading ==" nil))
+
+
+(ert-deftest test-moin--heading-determine-content ()
+  "`moin--heading-determine-content' must return the correct heading text, even if the 
+heading is malformed"
+  (test-moin--execute-on-heading 'moin--heading-determine-content "= Heading 1 =" "Heading 1")
+  (test-moin--execute-on-heading 'moin--heading-determine-content "== Heading 2 " "Heading 2")
+  (test-moin--execute-on-heading 'moin--heading-determine-content "=== Heading 3 =" "Heading 3")
+  (test-moin--execute-on-heading 'moin--heading-determine-content "==== Heading 4 =====" "Heading 4")
+  (test-moin--execute-on-heading 'moin--heading-determine-content "===== Heading 5 =====" "Heading 5"))
+
+
+(ert-deftest test-moin--heading-determine-level ()
+  "`moin--heading-determine-level' must return the correct heading level, even if the 
+heading is malformed"
+  (test-moin--execute-on-heading 'moin--heading-determine-level "= Heading 1 =" 1)
+  (test-moin--execute-on-heading 'moin--heading-determine-level "== Heading 2 " 2)
+  (test-moin--execute-on-heading 'moin--heading-determine-level "=== Heading 3 =" 3)
+  (test-moin--execute-on-heading 'moin--heading-determine-level "==== Heading 4 =====" 4)
+  (test-moin--execute-on-heading 'moin--heading-determine-level "===== Heading 5 =====" 5))
+
+
+(ert-deftest test-moin--heading-determine-section-level ()
+  "`moin--heading-determine-section-level' must return the correct heading level, even if the 
+heading is malformed"
+  (test-moin--execute-on-heading 'moin--heading-determine-section-level "= Heading 1 =" 1)
+  (test-moin--execute-on-heading 'moin--heading-determine-section-level "== Heading 2\nasdasdasd\n\n\n asdasd " 2)
+  (test-moin--execute-on-heading 'moin--heading-determine-section-level "=== Heading 3 =\n\n\n\ntextextext\n\ntexttext" 3)
+  (test-moin--execute-on-heading 'moin--heading-determine-section-level "==== Heading 4 =====" 4)
+  (test-moin--execute-on-heading 'moin--heading-determine-section-level "===== Heading 5 =====" 5))
+
+
+(ert-deftest test-moin--heading-determine-section-level-error ()
+  "`moin--heading-determine-section-level' must throw a user error if currently in a section
+without a heading before."
+  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text" 'error 1)
+  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text" 'error 2)
+  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text" 'error 5)
+  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text\n= Heading =" 'error 7))
+
+
+(defun test-moin--execute-on-heading (function text expected-return)
+  "Calls any given function on all characters of a text that is considered to be a heading,
+and checks its return value against an expected return value."
+  (with-temp-buffer
+    (moin-mode)
+    (insert text)
+    (beginning-of-line)
+    (while (not (eolp))
+      (setq point-before (point))
+      (should (equal expected-return (funcall function)))
+      (should (equal point-before (point)))
+      (forward-char 1))))
+
+
+(ert-deftest test-moin--heading-create ()
+  "Tests `moin--heading-create'."
+  (test-moin--heading-create 1 "hallo")
+  (test-moin--heading-create 2 "Text ")
+  (test-moin--heading-create 3 ""))
+
+
+(defun test-moin--heading-create (level text)
+  (with-temp-buffer
+    (setq expected-prefix (concat (make-string level ?=) " "))
+    (setq expected-suffix (concat " " (make-string level ?=)))
+    (setq text-len (length text))
+    
+    (moin-mode)
+    (moin--heading-create level text)
+    (should (equal (+ level text-len 2) (point)))
+    (beginning-of-line)
+    ;; Expect heading start markup
+    (should (equal expected-prefix (buffer-substring-no-properties 1 (+ level 2))))
+    ;; Expect heading text
+    (if text
+	(should (equal text (buffer-substring-no-properties (+ level 2) (+ level text-len 2)))))
+    ;; Expect heading end markup
+    (should (equal expected-suffix (buffer-substring-no-properties (+ level text-len 2) (+ level level text-len 3))))))
+
 
 ;; ==================================================
 ;; Testing table functions
@@ -219,7 +318,7 @@ It expects an error to be thrown."
     (message "Buffer string after test method call:\n%s" (buffer-string))
     (should (equal (+ start-point (length item-prefix) 1) (point)))
     (should (equal t (eolp)))
-    (should (equal item-prefix (buffer-substring (+ start-point 1) (point))))))
+    (should (equal item-prefix (buffer-substring-no-properties (+ start-point 1) (point))))))
 
 
 (ert-deftest test-moin--list-insert-item-same-level--point-before-item-text()
@@ -241,7 +340,7 @@ It expects an error to be thrown."
       (message "Buffer string after %s test method call(s):\n%s" start-point (buffer-string))
       (should (equal (+ (length item-prefix) 1) (point)))
       (should (equal t (eolp)))
-      (should (equal item-prefix (buffer-substring 1 (point)))))))
+      (should (equal item-prefix (buffer-substring-no-properties 1 (point)))))))
 
 
 (ert-deftest test-moin--list-insert-item-same-level--point-within-item-text()
@@ -262,9 +361,9 @@ It expects an error to be thrown."
       (moin--list-insert-item-same-level)
       (message "Buffer string after %s test method call(s):\n%s" (+ i 1) (buffer-string))
       (should (equal (+ (length item-prefix) start-point 1) (point)))
-      (should (equal item-prefix (buffer-substring (+ start-point 1) (point))))
+      (should (equal item-prefix (buffer-substring-no-properties (+ start-point 1) (point))))
       (setq expected-new-item-text (substring item-text (+ i 1)))
-      (should (equal expected-new-item-text (buffer-substring (point) (+ (point) (- (length item-text) i 1))))))))
+      (should (equal expected-new-item-text (buffer-substring-no-properties (point) (+ (point) (- (length item-text) i 1))))))))
 
 
 (ert-deftest test-moin--get-list-item-info-error ()
@@ -342,14 +441,14 @@ It expects an error to be thrown."
     
     (beginning-of-line)
     ;; Check text before new list (if any)
-    (should (equal (substring text-before 0 (- split-at-point 1)) (buffer-substring (point) split-at-point)))
+    (should (equal (substring text-before 0 (- split-at-point 1)) (buffer-substring-no-properties (point) split-at-point)))
     
     (if (> split-at-point 1)
 	(next-line))
     
     ;; Check that bullet is correctly inserted
-    (should (equal expected-bullet-text (buffer-substring (point) (+ (point) (length expected-bullet-text)))))
+    (should (equal expected-bullet-text (buffer-substring-no-properties (point) (+ (point) (length expected-bullet-text)))))
     (forward-char (length expected-bullet-text))
     
     ;; Check text of first list item
-    (should (equal (substring text-before (- split-at-point 1)) (buffer-substring (point) (+ 1 (point) (- (length text-before) split-at-point)))))))
+    (should (equal (substring text-before (- split-at-point 1)) (buffer-substring-no-properties (point) (+ 1 (point) (- (length text-before) split-at-point)))))))
