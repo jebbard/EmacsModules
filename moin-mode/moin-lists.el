@@ -49,7 +49,7 @@ with a non-whitespace character as first character of the line break the list."
     ;; This match string usually only covers the first line of an item! The sole case
     ;; where it spans two lines is that after the 
     (setq list-regex
-	  "^\\([\t ]+\\)\\([*.]\\|[1-9A-Za-z]\\.\\)[\t ]*\\([^[:space:]].*?$\\|$\\)")
+	  "^\\([\t ]+\\)\\([*.]\\|\\([1-9]+\\|[A-Za-z]\\)\\.\\)\\([\t ]*\\)\\([^[:space:]].*?$\\|$\\)")
     (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not (bobp)))
       (previous-line)
       (beginning-of-line))
@@ -78,12 +78,13 @@ whitespace, including a trailing dot for numbers"
 
   ;; moin-is-in-list-p stores position of match
   (setq start-pos (match-beginning 0))
-  (setq preamble-end-pos (match-beginning 3))
+  (setq preamble-end-pos (match-beginning 5))
 
-  (setq whitespace-before (match-string 1))
+  (setq whitespace-before-bullet (match-string 1))
+  (setq whitespace-after-bullet (match-string 4))
   (setq starting-bullet (match-string 2))
 
-  (list start-pos preamble-end-pos whitespace-before starting-bullet))
+  (list start-pos preamble-end-pos whitespace-before-bullet starting-bullet whitespace-after-bullet))
 
 
 (defun moin--list-insert-item-same-level (&optional arg)
@@ -99,6 +100,7 @@ function if point is currently not in a list."
   (setq current-item-preamble-end-pos (car (cdr item-info)))
   (setq current-item-whitespace-before (car (cdr (cdr item-info))))
   (setq current-item-starting-bullet (car (cdr (cdr (cdr item-info)))))
+  (setq current-item-whitespace-after (car (cdr (cdr (cdr (cdr item-info))))))
 
   (if (>= current-item-preamble-end-pos (point))
       ;; Item text starts after point -> Insert new item in front of current
@@ -106,7 +108,7 @@ function if point is currently not in a list."
 	(beginning-of-line)
 	(insert current-item-whitespace-before)
 	(insert current-item-starting-bullet)
-	(insert " ")
+	(insert current-item-whitespace-after)
 	(newline)
 	(previous-line)
 	(end-of-line))
@@ -115,13 +117,12 @@ function if point is currently not in a list."
       (newline)
       (insert current-item-whitespace-before)
       (insert current-item-starting-bullet)
-      (insert " "))))
+      (insert current-item-whitespace-after))))
 
 
 (defun moin--list-insert-item (list-string)
   "Inserts a new item with the given list-string after the current item"
-  (unless (looking-at "^\\s-*?$")
-    (end-of-line)
+  (unless (or (looking-at "^\\s-*?$") (bolp))
     (newline))
   (insert list-string))
 

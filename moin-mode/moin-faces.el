@@ -55,6 +55,19 @@ of tables, set to nil otherwise. Default is t"
 
 
 ;; ==================================================
+;; Constants
+
+(defconst moin-const-format-bold "'''"
+  "Bold formatting markup")
+
+(defconst moin-const-format-italic "''"
+  "Italic formatting markup")
+
+(defconst moin-const-format-underline "__"
+  "Underline formatting markup")
+
+
+;; ==================================================
 ;; Face definitions
 
 ; ------

@@ -439,7 +439,11 @@ is in the left-most column, the last field of the previous row."
 
 
 (defun moin-command-create-bullet-list (&optional arg)
-  "Create a new bullet-point list at the line after point. If currently already
+  "Create a new bullet-point. If point is at the end of line, it inserts a new line 
+after point and creates a new list on the next line. If point is not at the end 
+the line, it splits the current line at point and takes the remainder of the
+current line as content of the first item in the new list. If point is at the beginning
+of line, it turns the current line into a list item. If currently already
 in a list, this has a similar effect as using `moin-command-meta-return' to insert
 a new list item, with two major differences: Firstly the new item will be 
 inserted as top-level item, and secondly it will not respect the type of the 
@@ -451,7 +455,11 @@ use `moin-command-meta-return' instead."
 
 
 (defun moin-command-create-numbered-list (&optional arg)
-  "Create a new numbered list at the line after point. If currently already
+  "Create a new numbered list. If point is at the end of line, it inserts a new line 
+after point and creates a new list on the next line. If point is not at the end 
+the line, it splits the current line at point and takes the remainder of the
+current line as content of the first item in the new list. If point is at the beginning
+of line, it turns the current line into a list item. If currently already
 in a list, this has a similar effect as using `moin-command-meta-return' to insert
 a new list item, with two major differences: Firstly the new item will be 
 inserted as top-level item, and secondly it will not respect the type of the 
@@ -490,19 +498,19 @@ shown entirely, no folding.
 (defun moin-command-format-bold (&optional arg)
   "Formats current region or point bold. See `moin-format' for details. This command is basic in a sense that it does not check if it is already in a formatted area."
   (interactive "p")
-  (moin-format "'''"))
+  (moin-format moin-const-format-bold))
 
 
 (defun moin-command-format-italic (&optional arg)
   "Formats current region or point italic. See `moin-format' for details. This command is basic in a sense that it does not check if it is already in a formatted area."
   (interactive "p")
-  (moin-format "''"))
+  (moin-format moin-const-format-italic))
 
 
 (defun moin-command-format-underline (&optional arg)
   "Formats current region or point as underlined. See `moin-format' for details. This command is basic in a sense that it does not check if it is already in a formatted area."
   (interactive "p")
-  (moin-format "__"))
+  (moin-format moin-const-format-underline))
 
 
 ;; ==================================================
