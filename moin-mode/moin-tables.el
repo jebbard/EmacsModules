@@ -130,6 +130,55 @@ Expects to actually be in a table as prerequisite. Never call this
 function if point is currently not in a table."
   (user-error "Not implemented yet for tables!"))
 
+(defconst moin--table-delimiter "||"
+  "Delimiter used to identify MoinMoin tables")
+
+(defun moin--table-determine-column-details ()
+  "Determines the column details of the current row. Expects to actually 
+be in a table as prerequisite. Never call this function if point is 
+currently not in a table.
+
+The column details are presented in a list containing the following
+* The first element is the current table colum, i.e. the logical column in
+the current row where point is currently in; if the table is consisting of 0
+columns, it contains a 0 and the list has only this single element; otherwise
+it contains the 1-based column index, which then can also be used on this
+entire returned list for getting the current column details
+* All other entries have the form (start-point end-point content) where 'start-point' is 
+an integer with the buffer's point value of the first character directly after
+'||', i.e. where the column content begins, 'end-point' is an integer with the buffer's 
+point value adter the last character directly before '||', i.e. where the column ends,
+and 'content' is the actual string content of the column, including any enclosing
+whitespace, but without the column delimiters '||'."
+  (interactive)
+  (setq column-regex (concat moin--table-delimiter "\\(.*?\\)" moin--table-delimiter))
+  (setq column-deliminter-size (length moin--table-delimiter))
+  (setq return-list (list ()))
+  
+  (save-excursion
+    (beginning-of-line)
+    (setq current-point (point))
+    (while (< (+ current-point column-deliminter-size) (point-at-eol))
+      (if (looking-at column-regex)
+	  (progn
+	    (setq start-point (match-beginning 1))
+	    (setq end-point (match-end 1))
+	    (setq content (match-string 1))
+	    (message "START %s" start-point)
+	    (message "END %s" end-point)
+	    (message "CONTENT %s" content)
+
+	    (setq column-details '(start-point end-point content))
+	    
+	    (setq (append return-list column-details))
+	    (setq current-point end-point)
+            (goto-char current-point)
+	    )
+	(setq current-point (point-at-eol)))))
+
+  (message "LIST: %s" return-list)
+
+  return-list)
 
 
 ;; ==================================================

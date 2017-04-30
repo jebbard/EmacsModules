@@ -98,6 +98,8 @@
 ;; v0.4    2017-03-26  Jens Ebert            <jensebert@gmx.net>
 ;; - Implemented creation of new headings
 ;; - Modularization of moin-mode
+;; v0.5    2017-04-30  Jens Ebert            <jensebert@gmx.net>
+;; - Added first list functions
 
 ;;; Code:
 ;; ==================================================
@@ -148,7 +150,16 @@
   
   ;; Moving in tables or Outline cycle (a.k.a. visibility cycling)
   (define-key moin-mode-map [tab] 'moin-command-tab)
-  (define-key moin-mode-map (kbd "S-<tab>") 'moin-command-table-previous-field))
+  (define-key moin-mode-map (kbd "S-<tab>") 'moin-command-table-previous-field)
+
+  ;; Specific list commands
+  (define-key moin-mode-map (kbd "C-c C-b") 'moin-command-create-bullet-list)
+  (define-key moin-mode-map (kbd "C-c C-n") 'moin-command-create-numbered-list)
+
+  ;; Formatting commands
+  (define-key moin-mode-map (kbd "C-c C-f C-b") 'moin-command-format-bold)
+  (define-key moin-mode-map (kbd "C-c C-f C-i") 'moin-command-format-italic)
+  (define-key moin-mode-map (kbd "C-c C-f C-u") 'moin-command-format-underline))
 
 
 ;; ==================================================
@@ -164,6 +175,39 @@
       (if (moin-is-on-heading-p)
 	  (message "HEADING")
 	(message "NONE")))))
+
+
+(defun moin-format (formatting-prefix-and-suffix)
+  "Formats the current region with an arbitrary single line MoinMoin formatting.
+  Alternatively, if there is no region, inserts the fornmatting prefixes and
+  suffixes and places point between them. If the region spans multiple lines, it issues an error message, as MoinMoin does not support formatting to
+span multiple lines. It does not check if it is already in a formatted area."
+  (interactive "p")
+  (setq prefix-suffix-len (length formatting-prefix-and-suffix))
+  
+  (if (region-active-p)
+      (progn
+	(setq start-point (region-beginning))
+	(setq end-point (region-end))
+
+	(goto-char end-point)
+
+	;; Special case: One full line is selected, and end of region actually
+	;; is on beginning of the next line. count-lines returns 1 in that case,
+	;; but this also would result in multi-line formattings.
+	(if (or (> (count-lines start-point end-point) 1) (bolp))
+	    (user-error "Cannot format region spanning multiple lines"))
+	
+	(goto-char start-point)
+	(insert formatting-prefix-and-suffix)
+	(goto-char (+ end-point prefix-suffix-len))
+	(insert formatting-prefix-and-suffix))
+    (progn
+	(insert formatting-prefix-and-suffix)
+	(insert formatting-prefix-and-suffix)))
+  
+  (backward-char prefix-suffix-len))
+
 
 ;; ==================================================
 ;; Commands
@@ -341,7 +385,7 @@ is currently in the middle of the field. It creates a new row if point is
 currently in the last row. In contrast to org mode, selection or prefix
 arguments are not considered, there is no specific functionality for this.
 * If point is currently in a list, it inserts a new item with the same
-level as one at point. If the comamnd is used in the middle of a list item,
+level as the one at point. If the comamnd is used in the middle of a list item,
 it is split and the text after point is taken as text of the new item. 
 The new item is then inserted after the item at point. If point is
 currently before the item, the new item is inserted before the current 
@@ -359,7 +403,7 @@ there is no heading before point."
   (if (moin-is-in-table-p)
       (moin--table-next-row-split-field arg)
     (if (moin-is-in-list-p)
-	(moin--list-insert-item arg)
+	(moin--list-insert-item-same-level arg)
       ;; else insert a new headline
       (moin--heading-insert arg))))
 
@@ -394,6 +438,30 @@ is in the left-most column, the last field of the previous row."
   )
 
 
+(defun moin-command-create-bullet-list (&optional arg)
+  "Create a new bullet-point list at the line after point. If currently already
+in a list, this has a similar effect as using `moin-command-meta-return' to insert
+a new list item, with two major differences: Firstly the new item will be 
+inserted as top-level item, and secondly it will not respect the type of the 
+previous top-level item, but always inserts a bullet-point item. Thus, you should use 
+this command really only to create a new list, and if you are already in a list, 
+use `moin-command-meta-return' instead."
+  (interactive "p")
+  (moin--list-insert-item moin-const-bullet-list))
+
+
+(defun moin-command-create-numbered-list (&optional arg)
+  "Create a new numbered list at the line after point. If currently already
+in a list, this has a similar effect as using `moin-command-meta-return' to insert
+a new list item, with two major differences: Firstly the new item will be 
+inserted as top-level item, and secondly it will not respect the type of the 
+previous top-level item, but always inserts a numbered item. Thus, you should use 
+this command really only to create a new list, and if you are already in a list, 
+use `moin-command-meta-return' instead."
+  (interactive "p")
+  (moin--list-insert-item moin-const-numbered-list))
+
+
 (defun moin-command-tab (&optional arg)
   "Context-sensitive command that performs different functions based on the
 context:
@@ -417,6 +485,24 @@ shown entirely, no folding.
     (if (moin-is-on-heading-p)
 	(moin--heading-outline-cycle arg)
       (call-interactively (global-key-binding "\t")))))
+
+
+(defun moin-command-format-bold (&optional arg)
+  "Formats current region or point bold. See `moin-format' for details. This command is basic in a sense that it does not check if it is already in a formatted area."
+  (interactive "p")
+  (moin-format "'''"))
+
+
+(defun moin-command-format-italic (&optional arg)
+  "Formats current region or point italic. See `moin-format' for details. This command is basic in a sense that it does not check if it is already in a formatted area."
+  (interactive "p")
+  (moin-format "''"))
+
+
+(defun moin-command-format-underline (&optional arg)
+  "Formats current region or point as underlined. See `moin-format' for details. This command is basic in a sense that it does not check if it is already in a formatted area."
+  (interactive "p")
+  (moin-format "__"))
 
 
 ;; ==================================================
