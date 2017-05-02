@@ -45,13 +45,13 @@ sets point to the beginning of the test buffer."
     (funcall action args)))
 
 
-(defun test-moin--command-at-point-expects-error(command text error set-point &optional region-size)
+(defun test-moin--command-at-point-expects-error(command initial-text error initial-point &optional region-size)
   "Inserts the given text into a temporary buffer, then sets point to a specific
 position, optionally selects a region, and finally calls an arbitrary command. 
 It expects an error to be thrown."
   (with-temp-buffer
-    (insert text)
-    (goto-char set-point)
+    (insert initial-text)
+    (goto-char initial-point)
 
     ;; Set the region before executing the command
     (if region-size
@@ -60,6 +60,28 @@ It expects an error to be thrown."
 	  (forward-char region-size)))
     
     (should-error (funcall command) :type error)))
+
+
+(defun test-moin--command-at-point-changes-buffer(command initial-text initial-point expected-point expected-buffer &optional region-size)
+  "Inserts the given text into a temporary buffer, then sets point to a specific
+position, optionally selects a region, and finally calls an arbitrary command. 
+It expects the buffer content to be as given by expected-buffer, and the new point at 
+the given expected location."
+  (with-temp-buffer
+    (moin-mode)
+    (insert initial-text)
+    (goto-char initial-point)
+    (funcall command)
+
+    ;; Set the region before executing the command
+    (if region-size
+	(progn
+	  (set-mark-command nil)
+	  (forward-char region-size)))
+    
+    (should (equal expected-point (point)))
+    (should (equal expected-buffer (buffer-string)))))
+
 
 ;; ==================================================
 ;; Testing syntax highlighting functions
@@ -108,33 +130,45 @@ It expects an error to be thrown."
     
     (should (equal new-formatting-end-point (point)))
     ;; Check text before formatted text - must be unchanged
-    (should (equal (substring text 0 (- formatting-start-point 1)) (buffer-substring-no-properties 1 formatting-start-point)))
+    (should (equal (substring text 0 (- formatting-start-point 1))
+		   (buffer-substring-no-properties 1 formatting-start-point)))
     ;; Check markup start
-    (should (equal markup (buffer-substring-no-properties formatting-start-point (+ formatting-start-point markup-len))))
+    (should (equal markup (buffer-substring-no-properties
+			   formatting-start-point (+ formatting-start-point markup-len))))
     ;; Check formatted text (within markup) - must be unchanged
-    (should (equal (substring text (- formatting-start-point 1) (- formatting-end-point 1)) (buffer-substring-no-properties (+ formatting-start-point markup-len)  new-formatting-end-point)))
+    (should (equal (substring text (- formatting-start-point 1)
+			      (- formatting-end-point 1)) (buffer-substring-no-properties
+			   (+ formatting-start-point markup-len) new-formatting-end-point)))
     ;; Check markup end
-    (should (equal markup (buffer-substring-no-properties new-formatting-end-point (+ new-formatting-end-point markup-len))))
+    (should (equal markup (buffer-substring-no-properties
+			   new-formatting-end-point (+ new-formatting-end-point markup-len))))
     ;; Check text after formatted text - must be unchanged
-    (should (equal (substring text (- formatting-end-point 1)) (buffer-substring-no-properties (+ new-formatting-end-point markup-len) (point-at-eol))))))
+    (should (equal (substring text (- formatting-end-point 1))
+		   (buffer-substring-no-properties (+ new-formatting-end-point markup-len) (point-at-eol))))))
 
 
 (ert-deftest test-moin-command-format-bold-error()
   "Tests proper error handling of `moin-command-format-bold'"
-  (test-moin--command-at-point-expects-error 'moin-command-format-bold "Text\narbitrary other test text" 'user-error 2 5)
-  (test-moin--command-at-point-expects-error 'moin-command-format-bold "Text\narbitrary other test text" 'user-error 3 7))
+  (test-moin--command-at-point-expects-error 'moin-command-format-bold
+					     "Text\narbitrary other test text" 'user-error 2 5)
+  (test-moin--command-at-point-expects-error 'moin-command-format-bold
+					     "Text\narbitrary other test text" 'user-error 3 7))
 
 
 (ert-deftest test-moin-command-format-italic-error()
   "Tests proper error handling of `moin-command-format-italic'"
-  (test-moin--command-at-point-expects-error 'moin-command-format-italic "Text\narbitrary other test text" 'user-error 2 5)
-  (test-moin--command-at-point-expects-error 'moin-command-format-italic "Text\narbitrary other test text" 'user-error 3 7))
+  (test-moin--command-at-point-expects-error 'moin-command-format-italic
+					     "Text\narbitrary other test text" 'user-error 2 5)
+  (test-moin--command-at-point-expects-error 'moin-command-format-italic
+					     "Text\narbitrary other test text" 'user-error 3 7))
 
 
 (ert-deftest test-moin-command-format-underline-error()
   "Tests proper error handling of `moin-command-format-underline'"
-  (test-moin--command-at-point-expects-error 'moin-command-format-underline "Text\narbitrary other test text" 'user-error 2 5)
-  (test-moin--command-at-point-expects-error 'moin-command-format-underline "Text\narbitrary other test text" 'user-error 3 7))
+  (test-moin--command-at-point-expects-error 'moin-command-format-underline
+					     "Text\narbitrary other test text" 'user-error 2 5)
+  (test-moin--command-at-point-expects-error 'moin-command-format-underline
+					     "Text\narbitrary other test text" 'user-error 3 7))
 
 
 ;; ==================================================
@@ -192,15 +226,6 @@ heading is malformed"
   (test-moin--execute-on-heading 'moin--heading-determine-section-level "===== Heading 5 =====" 5))
 
 
-(ert-deftest test-moin--heading-determine-section-level-error ()
-  "`moin--heading-determine-section-level' must throw a user error if currently in a section
-without a heading before."
-  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text" 'error 1)
-  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text" 'error 2)
-  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text" 'error 5)
-  (test-moin--command-at-point-expects-error 'moin--heading-determine-section-level "Any text\n= Heading =" 'error 7))
-
-
 (defun test-moin--execute-on-heading (function text expected-return)
   "Calls any given function on all characters of a text that is considered to be a heading,
 and checks its return value against an expected return value."
@@ -213,6 +238,25 @@ and checks its return value against an expected return value."
       (should (equal expected-return (funcall function)))
       (should (equal point-before (point)))
       (forward-char 1))))
+
+
+(ert-deftest test-moin--heading-determine-section-level-no-heading ()
+  "`moin--heading-determine-section-level' must return 0 if currently in a section
+without a heading before."
+  (test-moin--determine-section-level-no-heading "" 1)
+  (test-moin--determine-section-level-no-heading "Any text" 1)
+  (test-moin--determine-section-level-no-heading "Any text" 3)
+  (test-moin--determine-section-level-no-heading "Any text" 4)
+  (test-moin--determine-section-level-no-heading "Any text\n= Heading =" 5))
+
+
+(defun test-moin--determine-section-level-no-heading (text point-before)
+  (with-temp-buffer
+    (moin-mode)
+    (insert text)
+    (goto-char point-before)
+    (should (equal 0 (moin--heading-determine-section-level)))
+    (should (equal point-before (point)))))
 
 
 (ert-deftest test-moin--heading-create ()
@@ -238,8 +282,127 @@ and checks its return value against an expected return value."
     (if text
 	(should (equal text (buffer-substring-no-properties (+ level 2) (+ level text-len 2)))))
     ;; Expect heading end markup
-    (should (equal expected-suffix (buffer-substring-no-properties (+ level text-len 2) (+ level level text-len 3))))))
+    (should (equal expected-suffix (buffer-substring-no-properties
+				    (+ level text-len 2) (+ level level text-len 3))))))
 
+
+(ert-deftest test-moin--heading-fix-suffix ()
+  "`moin--heading-fix-suffix' must fix any malformed and non-malformed heading suffix"
+  (test-moin--check-heading-fix-suffix "= " "Heading 1" " =" " =" 1)
+  (test-moin--check-heading-fix-suffix "== " "Heading 2" " " " ==" 2)
+  (test-moin--check-heading-fix-suffix "=== " "Heading 3" " =" " ===" 3)
+  (test-moin--check-heading-fix-suffix "==== " "Heading 4" " =====" " ====" 4)
+  (test-moin--check-heading-fix-suffix "===== " "Heading 5" " =====" " =====" 5)
+  (test-moin--check-heading-fix-suffix "===== " "Heading 5" "=====" " =====" 5)
+  (test-moin--check-heading-fix-suffix "===== " "Heading 5= asdasd" " = =   == = 	=" " =====" 5))
+
+
+(defun test-moin--check-heading-fix-suffix(prefix text suffix correct-suffix level)
+  (with-temp-buffer
+    (moin-mode)
+    (insert (concat prefix text suffix))
+    (beginning-of-line)
+    (moin--heading-fix-suffix level)
+    (beginning-of-line)
+    (should (looking-at (concat prefix text correct-suffix)))))
+
+
+(ert-deftest test-moin-command-meta-return ()
+  "Checks `moin-command-meta-return' for headings"
+  ;; First we check issuing the command at the end of a heading line
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"= Heading 1 =" 14 17 "= Heading 1 =\n=  =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"= Heading 1 =" 13 17 "= Heading 1 =\n=  =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"== Heading 2 ==" 13 20 "== Heading 2 ==\n==  ==\n")
+  ;; Then we check issuing the command within the prefix,
+  ;; but not directly at the beginning of a heading line, before any text
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"===== Heading 5 = = =" 4 29 "===== Heading 5 = = =\n=====  =====\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"== Heading 2" 4 17 "== Heading 2\n==  ==\n")
+  ;; Then we check issuing the command at the beginning of a heading line
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"=== Heading 3 " 1 5 "===  ===\n=== Heading 3 ")
+  ;; Then we check issuing the command within the heading text
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"= Heading 1 =" 4 17 "= H =\n= eading 1 =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+				"== Heading 2 ==" 11 20 "== Heading ==\n==  2 ==\n")
+  ;; Then we check issuing the command somewhere arbitrary behind a previous heading
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "== Heading 2 ==\nblindtext\nother text" 22 26 "== Heading 2 ==\nblind\n==  ==\ntext\nother text")
+  ;; Finally we check issuing the command before any other heading
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+	   "Text before heading\n== Heading 2 ==" 14 17 "Text before h\n=  =\neading\n== Heading 2 ==")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+	   "Text before heading" 2 5 "T\n=  =\next before heading"))
+
+
+(ert-deftest test-moin-command-insert-heading-respect-content()
+  "Checks `moin-command-insert-heading-respect-content'"
+  ;; Check the behaviour in case the current section has no sub-headings, and might
+  ;; have contents and siblings
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+					      "= Heading 1 =" 14 17 "= Heading 1 =\n=  =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+					      "= Heading 1 =\n\nAny text behind\nother text\n\n\n" 10 47
+					      "= Heading 1 =\n\nAny text behind\nother text\n\n\n=  =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+					      "= Heading 1.1 =\n= Heading 1.2 =\n" 5 19
+					      "= Heading 1.1 =\n=  =\n= Heading 1.2 =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+      "= Heading 1.1 =\nAny Text here and there\n\nAnd another line of text\n= Heading 1.2 =\n" 3 69
+      "= Heading 1.1 =\nAny Text here and there\n\nAnd another line of text\n=  =\n= Heading 1.2 =\n")
+  
+  ;; Check the behaviour in case the current section has multiple sub-headings and a
+  ;; sibling heading afterwards, and point is somewhere between the first character of the heading
+  ;; and the first character of the next child heading
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+   "== Heading 2.1 ==\n\nAny text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===\n== Heading 2.2 ==" 12 81
+   "== Heading 2.1 ==\n\nAny text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===\n==  ==\n== Heading 2.2 ==")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+   "= Heading 1.1 =\nAny text\n== Heading 2.1 ==\nany further text\n== Heading 2.2 ==\nText Text Blindtext\n\n= Heading 1.2 =" 21 102
+   "= Heading 1.1 =\nAny text\n== Heading 2.1 ==\nany further text\n== Heading 2.2 ==\nText Text Blindtext\n\n=  =\n= Heading 1.2 =")
+
+  ;; Check the behaviour in case the current section has multiple sub-headings, but no
+  ;; sibling heading afterwards, and point is somewhere between the first character of the heading
+  ;; and the first character of the next child heading
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+   "== Heading 2.1 ==\n\nAny text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===" 12 81
+   "== Heading 2.1 ==\n\nAny text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===\n==  ==\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+   "= Heading 1.1 =\nAny text\n== Heading 2.1 ==\nany further text\n== Heading 2.2 ==\nText Text Blindtext\n\n" 21 102
+   "= Heading 1.1 =\nAny text\n== Heading 2.1 ==\nany further text\n== Heading 2.2 ==\nText Text Blindtext\n\n=  =\n")
+
+  ;; Check the behaviour in case point is at the beginning of a heading line
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+  				"= Heading 1 =" 1 3 "=  =\n= Heading 1 =")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+   "First text\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===" 12 15
+   "First text\n==  ==\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===")
+  
+  ;; Check the behaviour in case point is before the first heading (if any at all)
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+				"" 1 3 "=  =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+				"Text" 3 8 "Text\n=  =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+				"\n\nText\nOther Text\nYetanothertext\n\n\n" 10 38
+				"\n\nText\nOther Text\nYetanothertext\n\n\n=  =\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
+   "First text\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===" 6 15
+   "First text\n==  ==\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===")
+  )
+
+;; TODO: Test `moin-command-meta-shift-left' for headings, i.e. demote incl. subtree
+;; TODO: Test `moin-command-meta-shift-right' for headings, i.e. promote incl. subtree
+;; TODO: Test `moin-command-meta-left' for headings, i.e. demote without subtree
+;; TODO: Test `moin-command-meta-right' for headings, i.e. promote without subtree
+;; TODO: Test `moin-command-meta-up' for headings, i.e. move up
+;; TODO: Test `moin-command-meta-down' for headings, i.e. move down
+;; TODO: Test `moin-command-tab' for headings, i.e. outline cycle 
 
 ;; ==================================================
 ;; Testing table functions

@@ -74,12 +74,11 @@ on a heading"
   "Tries to determine the heading level of the current section where point 
 is in. If there is no previous heading, it throws an error."
   (save-excursion
-    (outline-back-to-heading t)
-    
-    (if (not (moin-is-on-heading-p))
-	(user-error "Point is currently not in a section with a heading"))
-
-    (moin--heading-determine-level)))
+    (setq section-level (condition-case nil
+	(progn
+	  (outline-back-to-heading t)
+	  (moin--heading-determine-level))
+	(error 0)))))
 
 
 (defun moin--determine-heading-folding-state ()
@@ -299,6 +298,10 @@ after the heading prefix"
 	    (moin--heading-create current-heading-level new-heading-text))))
     (progn
       (setq current-heading-level (moin--heading-determine-section-level))
+
+      (if (eq current-heading-level 0)
+	  (setq current-heading-level 1))
+      
       (newline)
       (moin--heading-create current-heading-level))))
 
@@ -307,27 +310,63 @@ after the heading prefix"
   "See `moin-command-insert-heading-respect-content' for details."
   (setq current-heading-level (moin--heading-determine-section-level))
 
-  ;; Check whether at least one direct child heading has an invisible body
-  (setq is-child-heading t)
-  
-  (while is-child-heading
+  ;; When there is no heading before point: search for the next heading
+  ;; or the end of the current buffer
+  (if (eq current-heading-level 0)
+      (progn
+	(outline-next-heading)
+	(if (moin-is-on-heading-p)
+	    (setq current-heading-level (moin--heading-determine-level))
+	  (progn
+	    (setq current-heading-level 1)
+	    (end-of-buffer)
+	    (if (not (looking-at "^$"))
+		(newline))))
+	(moin--heading-create current-heading-level))
     (progn
-      ;; Set point to next heading (no matter if visible or not)
-      (outline-next-heading)
-      
-      (if (moin-is-on-heading-p)
-	  (setq next-heading-level (moin--heading-determine-level))
-	;; else
-	(setq next-heading-level 0))
 
-      ;; Current heading has children
-      (if (<= next-heading-level current-heading-level)
-	  (setq is-child-heading nil))))
+      (if (and (moin-is-on-heading-p) (bolp))
+	  (moin--heading-create current-heading-level)
+	(progn
+	  (setq might-have-further-child-headings-p t)
+	  (end-of-line)
 
-  (if (eq next-heading-level 0)
-      (end-of-buffer))
+	  (setq initial-point (point))
+	  (setq current-point nil)
 
-  (moin--heading-create current-heading-level))
+          ;; If point remains where it is, there is actually no next heading
+          ;; and we need to terminate the loop
+	  (while might-have-further-child-headings-p
+	    (setq current-point (point))
+	    
+	    (outline-next-heading)
+
+	    (if (eq current-point (point))
+		(progn
+		  (setq next-heading-level (moin--heading-determine-level))
+		  (setq might-have-further-child-headings-p nil))
+	      (progn
+		(if (moin-is-on-heading-p)
+		    (setq next-heading-level (moin--heading-determine-level))
+		  (setq next-heading-level 0))
+		(setq might-have-further-child-headings-p (> next-heading-level current-heading-level)))))
+
+	  (end-of-line)
+
+	  ;; After the while loop, there are four cases that could be distinguished:
+	  ;; (1) Point has not moved at all --> Heading has no children nor siblings, go to eob
+	  ;; (2) Point is on a child heading --> go to eob
+	  ;; (3) Pathetic case that point is not on a heading --> go to eob
+	  ;; (4) Nothing of the above, which means point is on a sibling heading
+	  (if (or (and (moin-is-on-heading-p) (> (moin--heading-determine-level) current-heading-level))
+		  (not (moin-is-on-heading-p))
+		  (and (moin-is-on-heading-p) (eq initial-point (point))))
+	      (progn
+		(end-of-buffer)
+		(if (not (looking-at "^$"))
+		    (newline))))
+	    
+	  (moin--heading-create current-heading-level))))))
 
 
 ;; ==================================================

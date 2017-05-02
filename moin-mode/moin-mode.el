@@ -291,7 +291,7 @@ with next row), if it is not already the last row in the table."
 context:
 * If point is currently on a heading, it promotes the current subtree (i.e.
 the current heading and all its children), if the current heading is not
-already on level 1. This command does not work with an active mark is active,
+already on level 1. This command does not work with an active region,
 which will lead to an error message. It also fixes errors in the end marker 
 of the heading, if necessary.
 * If point is currently in a table, it removes the current column of the
@@ -314,7 +314,7 @@ the list."
 context:
 * If point is currently on a heading, it demotes the current subtree (i.e.
 the current heading and all its children), if the current heading is not
-already on level 5. This command does not work with an active mark is active,
+already on level 5. This command does not work with an active region,
 which will lead to an error message. It also fixes errors in the end marker 
 of the heading, if necessary.
 * If point is currently in a table, it inserts a new empty column to the 
@@ -391,14 +391,15 @@ The new item is then inserted after the item at point. If point is
 currently before the item, the new item is inserted before the current 
 item instead.
 * Otherwise, including the case that point is currently on a heading, it
-inserts a new heading with the same level as the one at point. If the 
-command is used in the middle of a heading line, it is split and the text
-after point is taken as text of the new heading. The new heading is then 
-inserted after the heading at point. If point is currently before the heading,
-the new heading is inserted before the current heading instead. If point 
-is not in a heading line, the new heading is inserted at point, at the same 
-level of the first heading before point. An error message is given if
-there is no heading before point."
+inserts a new heading with the same level as the one at point or the current
+section's heading. If there is no heading before point, it inserts a heading
+with level 1. If the command is used in the middle of a heading line, it is
+split and the text after point is taken as text of the new heading. The new
+heading is then inserted after the heading at point. If point is currently
+before the heading, the new heading is inserted before the current heading
+instead. If point is not in a heading line, the new heading is inserted at
+point, at the same level of the first heading before point. An error message
+is given if there is no heading before point."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-next-row-split-field arg)
@@ -411,7 +412,13 @@ there is no heading before point."
 (defun moin-command-insert-heading-respect-content (&optional arg)
   "Inserts a new heading with the same level of the current heading, 
 right after the subtree of the current heading. This also works when only
-in the body of a heading's section."
+in the body of a heading's section. If point is on the heading line and 
+at the beginning of line, the new heading is created directly before the 
+current heading. In any other case it is created after the subtree of the 
+current heading. If there is no heading at or before point, it tries to
+find the next section, and inserts a new heading with the same level
+directly before it. If there is no heading at all in the current buffer,
+it goes to the end of buffer and inserts a new heading line of level 1."
   (interactive "p")
   (moin--heading-insert-respect-content arg))
 

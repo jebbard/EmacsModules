@@ -144,14 +144,26 @@ No !WikiWord
 A FourElementWikiWord in the middle of the line
 
 A list:
+
  * asdas
  . asdsa
  .
    * next level
-   1. ha
+   1.ha
    A.
+ df
+ sds
+   
+	
+	
+
+   
+
+
+
    q.
    i.
+
    I.
                   .
 		  1.

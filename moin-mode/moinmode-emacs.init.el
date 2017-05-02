@@ -5,7 +5,7 @@
 (add-to-list 'load-path OUTSHINE_DIR)
 (add-to-list 'load-path OUTORG_DIR)
 
-(defconst MODULES_DIR "E:/Daten/Repositories/EmacsModules/moin-mode/")
+(defconst MODULES_DIR "C:/PRIVAT/EmacsModules/moin-mode/")
 (add-to-list 'load-path MODULES_DIR)
 
 (require 'moin-mode)
