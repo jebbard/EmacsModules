@@ -100,6 +100,9 @@
 ;; - Modularization of moin-mode
 ;; v0.5    2017-04-30  Jens Ebert            <jensebert@gmx.net>
 ;; - Added first list functions
+;; v0.6    2017-05-04  Jens Ebert            <jensebert@gmx.net>
+;; - Various automated tests and bugfixes for headings, tables, lists
+;; - Table creation
 
 ;;; Code:
 ;; ==================================================
@@ -151,6 +154,9 @@
   ;; Moving in tables or Outline cycle (a.k.a. visibility cycling)
   (define-key moin-mode-map [tab] 'moin-command-tab)
   (define-key moin-mode-map (kbd "S-<tab>") 'moin-command-table-previous-field)
+
+  ;; Specific table commands
+  (define-key moin-mode-map (kbd "C-c |") 'moin-command-create-table)
 
   ;; Specific list commands
   (define-key moin-mode-map (kbd "C-c C-b") 'moin-command-create-bullet-list)
@@ -306,7 +312,7 @@ the list."
     (if (moin-is-in-list-p)
 	(moin--list-outdent-subtree arg)
       (if (moin-is-on-heading-p)
-	  (moin--heading-change-level 'moin--heading-do-promote t)))))
+	  (moin--heading-change-level 'moin--heading-do-promote t -1)))))
 
 
 (defun moin-command-meta-shift-right (&optional arg)
@@ -328,7 +334,7 @@ can only be increased if it is not the first item below its parent."
     (if (moin-is-in-list-p)
 	(moin--list-indent-subtree arg)
       (if (moin-is-on-heading-p)
-	  (moin--heading-change-level 'moin--heading-do-demote t)))))
+	  (moin--heading-change-level 'moin--heading-do-demote t +1)))))
 
 
 (defun moin-command-meta-left (&optional arg)
@@ -351,7 +357,7 @@ item has children, its indentation can only be decreased by one."
     (if (moin-is-in-list-p)
 	(moin--list-outdent-item arg)
       (if (moin-is-on-heading-p)
-	  (moin--heading-change-level 'moin--heading-do-promote nil)))))
+	  (moin--heading-change-level 'moin--heading-do-promote nil -1)))))
 
 
 (defun moin-command-meta-right (&optional arg)
@@ -373,7 +379,7 @@ first item below its parent."
     (if (moin-is-in-list-p)
 	(moin--list-indent-item arg)
       (if (moin-is-on-heading-p)
-	  (moin--heading-change-level 'moin--heading-do-demote nil)))))
+	  (moin--heading-change-level 'moin--heading-do-demote nil +1)))))
 
 
 (defun moin-command-meta-return (&optional arg)
@@ -484,7 +490,11 @@ context:
 or to the first field of the next row, if the current field is in the last
 column of the table. If the current field is the last field of the table
 in the right-most column, this command will create a new empty row and put
-point into the left-most field of the new row.
+point into the left-most field of the new row. If the next field already
+constains text, this command positions point just before the first 
+non-whitespace character of the field. For both the current as well as the
+next field, this command ensures that there is just one blank after the previous
+and before the next column separator after moving to the next field.
 * If point is currently on a heading, it performs visibility cycling. It 
 cycles the current heading level between three states:
  * FOLDED: Hides the entire subtree and content of the current heading
@@ -520,6 +530,21 @@ shown entirely, no folding.
   (moin-format moin-const-format-underline))
 
 
+(defun moin-command-create-table (&optional arg)
+  "Creates a new moin-style table with the given number of rows and columns.
+If point is at beginning of line, the table is created before the current line, and 
+a newline is inserted between table and text. If point is not at the beginning of 
+line, the table is created after the current line, and a newline is inserted between 
+text and table."
+  (interactive "P")
+
+  (setq table-size-string
+	(read-string (concat "Table size Columns x Rows [e.g. " moin-const-table-default-size "]: ")
+		     "" nil moin-const-table-default-size))
+
+  (moin--table-create table-size-string))
+
+
 ;; ==================================================
 ;; Major mode definition
 
@@ -527,7 +552,7 @@ shown entirely, no folding.
   "Set major mode for editing MoinMoin pages"
   ;; Preparations for outline minor mode
   (make-local-variable 'outline-regexp)
-  (setq outline-regexp "=\\{1,5\\} ")
+  (setq outline-regexp "=\\{1,5\\}")
   ;; Setup related modes
   (toggle-truncate-lines 0)
   (visual-line-mode 1)

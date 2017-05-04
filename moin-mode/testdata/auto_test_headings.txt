@@ -1,0 +1,43 @@
+= Level 1 Heading: Moin Syntax Highlighting Test =
+<<TableOfContents(4)>>
+== Level 2 Heading: Formatting ==
+=== Level 3 Heading: Formatting at beginning of line: ===
+''italic''
+'''bold'''
+`monospace`
+__underline__
+--(stroke)--
+~-smaller-~
+~+larger+~
+^super^script
+,,sub,,script
+
+normal ~-smaller-~ normal ~+larger+~ normal
+
+==== Level 4 Heading ====
+===== Level 5 Heading =====
+=== Level 3 Heading: Formatting in the middle of a line, single character only: ===
+start ''I''talic    end
+start '''B'''old    end
+start `M`onospace   end
+start __U__nderline end
+start --(S)--troke  end
+start ~-s-~maller   end
+start ~+L+~arger    end
+start ^S^uperscript end
+start ,,S,,ubscript end
+== Level 2 Heading with WikiWord: Table with formatting ==
+
+||<rowbgcolor="#AAAAAA"> no formatting ||<|4> Hallo ''italic'' huhu	  ||
+|| no formatting || '''bold'''	  ||
+|| no formatting || `monospace`	  ||
+|| no formatting || __underline__ ||
+|| no formatting || --(stroke)--  ||
+|| no formatting but {{{code in table}}} || ~-smaller-~	  ||
+|| no formatting || ~+larger+~	  ||
+|| no formatting || ^super^script ||
+|| no formatting || ,,sub,,script ||
+
+== Level 2 Heading: Environments ==
+{{{Code at beginning of line}}}
+

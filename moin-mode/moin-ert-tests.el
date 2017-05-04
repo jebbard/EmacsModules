@@ -286,25 +286,25 @@ without a heading before."
 				    (+ level text-len 2) (+ level level text-len 3))))))
 
 
-(ert-deftest test-moin--heading-fix-suffix ()
-  "`moin--heading-fix-suffix' must fix any malformed and non-malformed heading suffix"
-  (test-moin--check-heading-fix-suffix "= " "Heading 1" " =" " =" 1)
-  (test-moin--check-heading-fix-suffix "== " "Heading 2" " " " ==" 2)
-  (test-moin--check-heading-fix-suffix "=== " "Heading 3" " =" " ===" 3)
-  (test-moin--check-heading-fix-suffix "==== " "Heading 4" " =====" " ====" 4)
-  (test-moin--check-heading-fix-suffix "===== " "Heading 5" " =====" " =====" 5)
-  (test-moin--check-heading-fix-suffix "===== " "Heading 5" "=====" " =====" 5)
-  (test-moin--check-heading-fix-suffix "===== " "Heading 5= asdasd" " = =   == = 	=" " =====" 5))
+(ert-deftest test-moin--heading-fix ()
+  "`moin--heading-fix' must fix any malformed and non-malformed heading prefix or suffix"
+  (test-moin--check-heading-fix "" "Heading 1" " =" "=" 1)
+  (test-moin--check-heading-fix " " "Heading 2" " " "==" 2)
+  (test-moin--check-heading-fix "== " "Heading 3" " =" "===" 3)
+  (test-moin--check-heading-fix "==== " "Heading 4" " =====" "====" 4)
+  (test-moin--check-heading-fix "===== " "Heading 5" " =====" "=====" 5)
+  (test-moin--check-heading-fix "=== " "Heading 5" "=====" "=====" 5)
+  (test-moin--check-heading-fix "===== " "Heading 5= asdasd" " = =   == =	=" "=====" 5))
 
 
-(defun test-moin--check-heading-fix-suffix(prefix text suffix correct-suffix level)
+(defun test-moin--check-heading-fix(prefix text suffix correct-suffix level)
   (with-temp-buffer
     (moin-mode)
     (insert (concat prefix text suffix))
     (beginning-of-line)
-    (moin--heading-fix-suffix level)
+    (moin--heading-fix level)
     (beginning-of-line)
-    (should (looking-at (concat prefix text correct-suffix)))))
+    (should (looking-at (concat correct-suffix " " text " " correct-suffix)))))
 
 
 (ert-deftest test-moin-command-meta-return ()
@@ -393,21 +393,244 @@ without a heading before."
 				"\n\nText\nOther Text\nYetanothertext\n\n\n=  =\n")
   (test-moin--command-at-point-changes-buffer 'moin-command-insert-heading-respect-content
    "First text\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===" 6 15
-   "First text\n==  ==\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ===")
+   "First text\n==  ==\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ==="))
+
+
+(ert-deftest test-moin-change-level-without-subtree()
+  "Checks `moin-command-meta-left' and `moin-command-meta-right'
+connection with each other."
+  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
+						 "" "Heading 1" "" "" 1 5)
+  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
+						 "" "Heading 1" "" "" 1 1)
+  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
+						 "Anytext before\n" "Heading 2" "\nAny text behind" "" 2 19)
+  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
+	 "Anytext before\n" "Heading 3" "\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n" "=== H3 ===\n" 3 19))
+
+
+(ert-deftest test-moin-change-level-with-subtree()
+  "Checks `moin-command-meta-shift-left' and `moin-command-meta-shift-right'
+connection with each other."
+  (test-moin--check-change-level 'moin-command-meta-shift-left 'moin-command-meta-shift-right
+						 "" "Heading 1" "" "" 1 5)
+  ;; (test-moin--check-change-level 'moin-command-meta-shift-left 'moin-command-meta-shift-right
+  ;; 						 "" "Heading 1" "" "" 1 1)
+  ;; (test-moin--check-change-level 'moin-command-meta-shift-left 'moin-command-meta-shift-right
+  ;; 						 "Anytext before\n" "Heading 2" "\nAny text behind" "" 2 19)
+  ;; (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
+  ;; 	 "Anytext before\n" "Heading 3" "\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n" "=== H3 ===\n" 3 19))
   )
+
+
+(defun test-moin--make-heading (heading-text level)
+  "Creates and returns a new heading with the given text
+on the given level"
+  (setq heading-pre-suf (make-string level ?=))
+  (concat heading-pre-suf " " heading-text " " heading-pre-suf))
+
+
+(defun test-moin--check-change-level(command-left command-right pre-text heading-text
+			    subtree post-text start-level start-pos &optional subtree-change-func)
+  "Inserts any prefix text, then a heading-text with the given start level
+(should be on its own line, the prefix and postfix text must contain the
+corresponding line breaks) as well as a postfix text into a new temporary
+buffer, then goes to the specified start position (which should be on the
+heading line) and executes a number of change level commands. Then it checks
+their outcome."
+  (with-temp-buffer
+    (moin-mode)
+
+    ;; Build the initial buffer contents
+    (setq heading-line (test-moin--make-heading heading-text start-level))
+
+    (insert
+     (concat pre-text heading-line
+     	 subtree post-text))
+    (goto-char start-pos)
+    (setq expect-point-at-bol-p (<= (current-column) start-level))
+
+    (test-moin--repeat-change-level command-right '<
+         moin-const-max-heading-level '+ start-level subtree-change-func)
+    (test-moin--repeat-change-level command-left  '>
+         1                            '- moin-const-max-heading-level subtree-change-func)))
 
 ;; TODO: Test `moin-command-meta-shift-left' for headings, i.e. demote incl. subtree
 ;; TODO: Test `moin-command-meta-shift-right' for headings, i.e. promote incl. subtree
-;; TODO: Test `moin-command-meta-left' for headings, i.e. demote without subtree
-;; TODO: Test `moin-command-meta-right' for headings, i.e. promote without subtree
 ;; TODO: Test `moin-command-meta-up' for headings, i.e. move up
 ;; TODO: Test `moin-command-meta-down' for headings, i.e. move down
 ;; TODO: Test `moin-command-tab' for headings, i.e. outline cycle 
 
+
+(defun test-moin--repeat-change-level (command compare-func compare-level change-func curr-level &optional subtree-change-func)
+  "Repeatedly performs command at current point, as long as an invocation of compare-func, 
+comparing curr-level with compare level is true. Within the loop, curr-level and curr-pos are
+changed after the command call using change-func, and finally some checking of expected buffer
+content is done. It additional can execute a subtree change function to transform the subtree 
+in some expected way before comparing it with the actual buffer content."
+  (setq curr-pos (point))
+  (while (funcall compare-func curr-level compare-level)
+    (funcall command)
+    (message "test-moin--check-change-level: buffer after command call: %s" (buffer-string))
+    (setq curr-level (funcall change-func curr-level 1))
+    
+    (setq heading-line (test-moin--make-heading heading-text curr-level))
+    
+    (setq curr-pos (funcall change-func curr-pos 1))
+    
+    ;; Point should not change by the command
+    (if expect-point-at-bol-p
+	(should (equal (point-at-bol) (point)))
+      (should (equal curr-pos (point))))
+
+    ;; We must not change point position as the test case goes
+    ;; on into the next loop
+    (save-excursion
+      (beginning-of-line)
+      (should (looking-at (concat "^" heading-line "$"))))
+    
+    ;; Rest of the buffer should be unchanged
+    (should (equal (concat pre-text heading-line subtree post-text) (buffer-string))))
+
+  ;; Another invocation must fail as we are already on lowest or highest level
+  (should-error (funcall command) :type 'user-error))
+
+
 ;; ==================================================
 ;; Testing table functions
 
-;; TODO
+(ert-deftest test-moin-is-in-table-p-when-in-table ()
+  "`moin-is-in-table-p' must return t when point is in a table."
+  (test-moin--execute-on-file "auto_test_tables.txt" 'test-moin--check-is-in-table t))
+
+
+(ert-deftest test-moin-is-in-table-p-when-not-in-table ()
+  "`moin-is-in-table-p' must return nil when point is not in a table."
+  (test-moin--execute-on-file "auto_test_notables.txt" 'test-moin--check-is-in-table nil))
+
+
+(defun test-moin--check-is-in-table(expected)
+  (while (not (eobp))
+    (should (equal expected (moin-is-in-table-p)))
+    (forward-char)))
+
+
+(ert-deftest test-moin--table-create ()
+  "Tests `moin--table-create' in positive cases"
+  (test-moin--table-create-positive "" "" "1x1" 4 "||  ||\n\n")
+  (test-moin--table-create-positive "" "" "3x1" 4 "||  ||  ||  ||\n\n")
+  (test-moin--table-create-positive "Hallo" "Jens" "4x3" 15 "\n\n||  ||  ||  ||  ||\n||  ||  ||  ||  ||\n||  ||  ||  ||  ||\n")
+  (test-moin--table-create-positive "Hallo\n" "" "2x4" 10 "||  ||  ||\n||  ||  ||\n||  ||  ||\n||  ||  ||\n\n")
+  (test-moin--table-create-positive "" "Jens" "1x2" 4 "||  ||\n||  ||\n\n"))
+
+
+(defun test-moin--table-create-positive (pre-text post-text size-string expected-point expected-table)
+  (with-temp-buffer
+    (moin-mode)
+    (insert (concat pre-text post-text))
+    (goto-char (+ (length pre-text) 1))
+    (moin--table-create size-string)
+    (message "test-moin--table-create-positive buffer string after funcall: %s" (buffer-string))
+    (if (eq 0 (length pre-text))
+	(should (equal (concat expected-table pre-text post-text) (buffer-string)))
+      (should (equal (concat pre-text post-text expected-table) (buffer-string))))
+    
+    (should (equal expected-point (point)))))
+
+
+(ert-deftest test-moin--table-create-error ()
+  "Tests `moin--table-create' in negative cases"
+  (test-moin--table-create-negative "0x1")
+  (test-moin--table-create-negative "1x0")
+  (test-moin--table-create-negative "ANY TExt")
+  (test-moin--table-create-negative "x1")
+  (test-moin--table-create-negative "xx1")
+  (test-moin--table-create-negative "4x1x454")
+  (test-moin--table-create-negative "Sx1"))
+
+
+(defun test-moin--table-create-negative (size-string)
+  (with-temp-buffer
+    (should-error (funcall 'moin--table-create size-string) :type 'user-error)))
+
+
+(ert-deftest test-moin--table-determine-column-details()
+  "Tests `moin--table-determine-column-details' for returning adequate values.
+Expectations are given in the list form (current-column (start-point end-point content))"
+  ;; Single row tables
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 4 (list 1 (list 3 5 "	 ") (list 7 9 "  ")))
+  (test-moin--check-table-determine-column-details "||	 ||||" 3 (list 1 (list 3 5 "	 ") (list 7 7 "")))
+  (test-moin--check-table-determine-column-details "||aaa||||" 8 (list 2 (list 3 6 "aaa") (list 8 8 "")))
+  (test-moin--check-table-determine-column-details "|| my text || another text ||  ||" 32
+		   (list 3 (list 3 12 " my text ") (list 14 28 " another text ") (list 30 32 "  ")))
+  (test-moin--check-table-determine-column-details "||	 ||" 4 (list 1 (list 3 5 "	 ")))
+  ;; Multi row tables
+  (test-moin--check-table-determine-column-details "|| my text || a ||\n|| bbbbbbb || cccc ||" 15
+						   (list 2 (list 3 12 " my text ") (list 14 17 " a ")))
+  (test-moin--check-table-determine-column-details "|| a |||| b ||\n|| c || || ||\nAny Text behind" 27
+				   (list 3 (list 18 21 " c ") (list 23 24 " ") (list 26 27 " ")))
+  ;; Point on column borders
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 1 (list 1 (list 3 5 "	 ") (list 7 9 "  ")))
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 2 (list 1 (list 3 5 "	 ") (list 7 9 "  ")))
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 10 (list 2 (list 3 5 "	 ") (list 7 9 "  ")))
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 11 (list 2 (list 3 5 "	 ") (list 7 9 "  ")))
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 6 (list 1 (list 3 5 "	 ") (list 7 9 "  ")))
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 10 (list 2 (list 3 5 "	 ") (list 7 9 "  "))))
+
+
+(defun test-moin--check-table-determine-column-details (text start-point expected-details)
+  (with-temp-buffer
+    (moin-mode)
+    (insert text)
+    (goto-char start-point)
+    (setq column-details (moin--table-determine-column-details))
+    (should (equal expected-details column-details))))
+
+
+(ert-deftest test-moin--table-next-field ()
+  "Tests `moin--table-next-field' in positive cases"
+  ;; Just move to the next field of the same row, without any buffer changes
+  ;; (test-moin--table-next-field-positive "||  ||  ||" 4 8)
+  ;; (test-moin--table-next-field-positive "||  ||  ||" 3 8)
+  ;;(test-moin--table-next-field-positive "|| my text || another text ||  ||" 6 15)
+  ;;(test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 31 34)
+  ;; ;; Special case: Point before first field
+  ;; (test-moin--table-next-field-positive "||  ||  ||" 2 4)
+  ;; (test-moin--table-next-field-positive "||  ||  ||" 1 4)
+  ;; ;; Move point to next line if in last column, without any buffer changes
+  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 15 23)
+  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 16 23)
+  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 17 23)
+  ;; ;; Special case: Point after last field of a line
+  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 18 23)
+  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 19 23)
+  ;; ;; Table whitespace corrections
+  ;; (test-moin--table-next-field-positive "|| || ||" 3 8 "||  ||  ||")
+  ;; (test-moin--table-next-field-positive "||  ||||" 4 8 "||  ||  ||")
+  ;; (test-moin--table-next-field-positive "||||||" 4 8 "||  ||  ||")
+  ;; (test-moin--table-next-field-positive "|| my text||a ||\n||bbbbbbb|| cccc ||" 15 23
+  ;; 					"|| my text|| a ||\n|| bbbbbbb || cccc ||")
+  ;; (test-moin--table-next-field-positive "|| my text ||another text ||" 6 15 "|| my text || another text ||")
+  ;; (test-moin--table-next-field-positive "|| my text || another text||" 6 15 "|| my text || another text ||")
+  ;; ;; Create new line if issued in last field of table
+  ;; (test-moin--table-next-field-positive "||  ||" 4 11 "||  ||\n||  ||")
+  ;; (test-moin--table-next-field-positive "|| a |||| b ||\n|| c || || ||\nAny Text behind" 26 34 "|| a |||| b ||\n|| c || ||  ||\n||  ||  ||  ||\nAny Text behind")
+  )
+
+
+(defun test-moin--table-next-field-positive (text start-point expected-point &optional expected-buffer)
+  (with-temp-buffer
+    (moin-mode)
+    (insert text)
+    (goto-char start-point)
+    (moin--table-next-field)
+    (message "test-moin--moin--table-next-field buffer string after funcall: %s" (buffer-string))
+    
+    (if expected-buffer
+	(should (equal expected-buffer (buffer-string)))
+      (should (equal text (buffer-string))))
+    
+    (should (equal expected-point (point)))))
 
 ;; ==================================================
 ;; Testing list functions

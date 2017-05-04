@@ -38,7 +38,10 @@
 
 (defun moin-is-on-heading-p ()
   "Is point on a header line?"
-  (outline-on-heading-p))
+  (if (outline-on-heading-p)
+      (save-excursion
+	(beginning-of-line)
+	(looking-at "=\\{1,5\\} "))))
 
 
 ;; ==================================================
@@ -52,12 +55,18 @@
     (setq heading-content (match-string 1))))
 
 
-(defun moin--heading-fix-suffix (updated-heading-level)
-  "Update and fix the suffix of heading, essentially replaces any combinations of
-blanks and '=' at the end of current line with a well-formed heading suffix of the
-given level."
+(defun moin--heading-fix (updated-heading-level)
+  "Update and fix the prefix and suffix of a heading, essentially replaces
+any combinations of blanks and '=' at the end or beginning of current line
+with a well-formed heading suffix of the given level."
+  (beginning-of-line)
+  (setq heading-pre-suf (make-string updated-heading-level ?=))
+  ;; Fix start of heading
+  (re-search-forward "^[ \t =]*")
+  (replace-match (concat heading-pre-suf " "))
+  ;; Fix end of heading
   (re-search-forward "[ \t =]*$")
-  (replace-match (concat " " (make-string updated-heading-level ?=))))
+  (replace-match (concat " " heading-pre-suf)))
 
 
 (defun moin--heading-determine-level ()
@@ -211,7 +220,7 @@ subtree of the current heading. Must be called only if point is currently on a h
 		  (moin--heading-determine-content) moin-const-max-heading-level)
     ;; else
     (outline-demote nil)
-    (moin--heading-fix-suffix (+ current-level 1))))
+    (moin--heading-fix (+ current-level 1))))
 
 
 (defun moin--heading-do-promote(current-level)
@@ -221,10 +230,10 @@ subtree of the current heading. Must be called only if point is currently on a h
 		  (moin--heading-determine-content))
     ;; else
     (outline-promote nil)
-    (moin--heading-fix-suffix (- current-level 1))))
+    (moin--heading-fix (- current-level 1))))
 
 
-(defun moin--heading-change-level (change-func including-subtree)
+(defun moin--heading-change-level (change-func including-subtree column-change)
   "Promotes or demotes the current heading (depending on the change-func provided), 
 either with or without subtree. This function was created to also take care of the 
 special characteristics of MoinMoin headings: They are enclosed by '=' signs. 
@@ -234,10 +243,17 @@ to take care of also demoting or promoting the rest of the heading."
   (save-excursion
     (if mark-active
 	(user-error "Command not supported if mark is active"))
+    (setq current-heading-level (moin--heading-determine-level))
+    (setq current-column (current-column))
+    
     (if including-subtree
 	(moin--heading-execute-action-on-subtree change-func)
-      (setq current-heading-level (moin--heading-determine-level))
-      (funcall change-func current-heading-level))))
+      (funcall change-func current-heading-level))
+
+    ;; Ensure point is at the right position after the command
+    (if (<= current-column current-heading-level)
+	(beginning-of-line)
+      (move-to-column (+ current-column column-change)))))
 
 
 (defun moin--heading-outline-cycle (&optional arg)

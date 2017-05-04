@@ -26,6 +26,21 @@
 
 ;;; Code
 
+
+;; ==================================================
+;; Constants
+
+(defconst moin-const-table-default-size "5x2"
+  "The default size of a new table in moin mode.")
+
+(defconst moin-const-table-delimiter "||"
+  "The MoinMoin table delimiter.")
+
+(defconst moin-const-quoted-table-delimiter
+  (regexp-quote moin-const-table-delimiter)
+  "The MoinMoin table delimiter in a regexp quoted form.")
+
+
 ;; ==================================================
 ;; Functions
 
@@ -33,7 +48,8 @@
   "Is point on a table line?"
   (save-excursion
     (beginning-of-line)
-    (looking-at "||")))
+    (looking-at (concat moin-const-quoted-table-delimiter
+			".*?" moin-const-quoted-table-delimiter))))
 
 
 ;; ==================================================
@@ -72,7 +88,12 @@ function if point is currently not in a table."
   "See `moin-command-tab' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (if (> current-column 1)
+      (progn
+	(re-search-forward (regexp-quote moin-const-table-delimiter))
+;; TODO implement
+	)
+    ))
 
 
 (defun moin--table-move-column-right (&optional arg)
@@ -130,8 +151,6 @@ Expects to actually be in a table as prerequisite. Never call this
 function if point is currently not in a table."
   (user-error "Not implemented yet for tables!"))
 
-(defconst moin--table-delimiter "||"
-  "Delimiter used to identify MoinMoin tables")
 
 (defun moin--table-determine-column-details ()
   "Determines the column details of the current row. Expects to actually 
@@ -139,46 +158,93 @@ be in a table as prerequisite. Never call this function if point is
 currently not in a table.
 
 The column details are presented in a list containing the following
-* The first element is the current table colum, i.e. the logical column in
-the current row where point is currently in; if the table is consisting of 0
-columns, it contains a 0 and the list has only this single element; otherwise
-it contains the 1-based column index, which then can also be used on this
-entire returned list for getting the current column details
+* The first element is the current table column, i.e. the 1-based logical
+column index in the current row where point is currently in, which then can
+also be used as index on this entire returned list for getting the current
+column details. In the special case that point is located before the first
+column content starts, the current-column is nevertheless set to 1. In all 
+other cases where point is in between the two delimiters '||' of the moin
+table (including the case where point is behind the last character of the last
+field of the current row), it is seen to be still located in previous column.
 * All other entries have the form (start-point end-point content) where 'start-point' is 
 an integer with the buffer's point value of the first character directly after
 '||', i.e. where the column content begins, 'end-point' is an integer with the buffer's 
-point value adter the last character directly before '||', i.e. where the column ends,
+point value after the last character directly before '||', i.e. where the column ends,
 and 'content' is the actual string content of the column, including any enclosing
 whitespace, but without the column delimiters '||'."
   (interactive)
-  (setq column-regex (concat moin--table-delimiter "\\(.*?\\)" moin--table-delimiter))
-  (setq column-deliminter-size (length moin--table-delimiter))
-  (setq return-list (list ()))
+  (setq column-regex
+	(concat moin-const-quoted-table-delimiter
+		"\\(.*?\\)" moin-const-quoted-table-delimiter))
+  (setq column-delimiter-size (length moin-const-table-delimiter))
   
   (save-excursion
+    (setq initial-point (point))
     (beginning-of-line)
-    (setq current-point (point))
-    (while (< (+ current-point column-deliminter-size) (point-at-eol))
-      (if (looking-at column-regex)
-	  (progn
-	    (setq start-point (match-beginning 1))
-	    (setq end-point (match-end 1))
-	    (setq content (match-string 1))
-	    (message "START %s" start-point)
-	    (message "END %s" end-point)
-	    (message "CONTENT %s" content)
+    (setq current-column 1)
+    (setq return-list (list))
 
-	    (setq column-details '(start-point end-point content))
-	    
-	    (setq (append return-list column-details))
-	    (setq current-point end-point)
-            (goto-char current-point)
-	    )
-	(setq current-point (point-at-eol)))))
+    (while (and (looking-at column-regex) (< (+ (point) column-delimiter-size) (point-at-eol)))
+      (setq start-point (match-beginning 1))
 
-  (message "LIST: %s" return-list)
+      ;; Special case: Point is exactly in the middle of the table delimiter '||'
+      ;; i.e. behind previous field end point and before next field start point
+      (if (and (> current-column 1) (> initial-point end-point) (< initial-point start-point))
+	  (add-to-list 'return-list (- current-column 1)))
+      
+      (setq end-point (match-end 1))
+      (setq content (match-string 1))
+
+      (if (and (>= initial-point start-point) (<= initial-point end-point))
+	  (add-to-list 'return-list current-column))
+
+      (setq column-details (list start-point end-point content))
+      (setq return-list (append return-list (list column-details)))
+      (goto-char end-point)
+      (setq current-column (+ current-column 1)))
+    
+    (if (< initial-point 3)
+	(add-to-list 'return-list 1)
+      (if (> initial-point (- (point-at-eol) 2))
+	  (add-to-list 'return-list (- current-column 1)))))
 
   return-list)
+
+
+(defun moin--table-create (table-size-string)
+  (setq error-message (concat "Invalid table size format specified, should be Columns x Rows [e.g. " moin-const-table-default-size "]"))
+
+  (setq table-size-list (split-string table-size-string "x" t nil))
+
+  (if (not (eq (length table-size-list) 2))
+      (user-error error-message))
+
+  (setq cols (string-to-number (car table-size-list)))
+  (setq rows (string-to-number (car (cdr table-size-list))))
+
+  ;; This includes the case of invalid row or column string
+  (if (or (< cols 1) (< rows 1))
+      (user-error error-message))
+
+  (if (bolp)
+      (progn
+	(newline)
+	(previous-line))
+    (progn
+      (end-of-line)
+      (newline)
+      (newline)))
+
+  (setq point-before-table (point))
+  
+  (dotimes (row rows)
+    (dotimes (col cols)
+      (insert moin-const-table-delimiter)
+      (insert "  "))
+    (insert moin-const-table-delimiter)
+    (newline))
+
+  (goto-char (+ point-before-table 3)))
 
 
 ;; ==================================================
