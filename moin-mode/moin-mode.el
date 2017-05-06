@@ -189,30 +189,32 @@
   suffixes and places point between them. If the region spans multiple lines, it issues an error message, as MoinMoin does not support formatting to
 span multiple lines. It does not check if it is already in a formatted area."
   (interactive "p")
-  (setq prefix-suffix-len (length formatting-prefix-and-suffix))
-  
-  (if (region-active-p)
+  (let
+      ((prefix-suffix-len (length formatting-prefix-and-suffix))
+       start-point, end-point)
+
+    (if (region-active-p)
+	(progn
+	  (setq start-point (region-beginning))
+	  (setq end-point (region-end))
+
+	  (goto-char end-point)
+
+	  ;; Special case: One full line is selected, and end of region actually
+	  ;; is on beginning of the next line. count-lines returns 1 in that case,
+	  ;; but this also would result in multi-line formattings.
+	  (if (or (> (count-lines start-point end-point) 1) (bolp))
+	      (user-error "Cannot format region spanning multiple lines"))
+	  
+	  (goto-char start-point)
+	  (insert formatting-prefix-and-suffix)
+	  (goto-char (+ end-point prefix-suffix-len))
+	  (insert formatting-prefix-and-suffix))
       (progn
-	(setq start-point (region-beginning))
-	(setq end-point (region-end))
-
-	(goto-char end-point)
-
-	;; Special case: One full line is selected, and end of region actually
-	;; is on beginning of the next line. count-lines returns 1 in that case,
-	;; but this also would result in multi-line formattings.
-	(if (or (> (count-lines start-point end-point) 1) (bolp))
-	    (user-error "Cannot format region spanning multiple lines"))
-	
-	(goto-char start-point)
-	(insert formatting-prefix-and-suffix)
-	(goto-char (+ end-point prefix-suffix-len))
-	(insert formatting-prefix-and-suffix))
-    (progn
 	(insert formatting-prefix-and-suffix)
 	(insert formatting-prefix-and-suffix)))
-  
-  (backward-char prefix-suffix-len))
+    
+    (backward-char prefix-suffix-len)))
 
 
 ;; ==================================================
@@ -247,13 +249,14 @@ as `outline-move-subtree-down': It moves the subtree of the
 current heading to the point after the previous heading of the same 
 level, if any. If there is no such heading, it prints an error message.
 * If point is currently in a table, it creates a new row before the 
-current row of the table.
+current row of the table. Positions point within the first field of 
+the new row.
 * If point is currently in a list, it moves the current item with its
 subtree down (swapping with next item), if it is not already the last
 item below its parent item."
   (interactive "p")
   (if (moin-is-in-table-p)
-      (moin--table-insert-row arg)
+      (moin--table-insert-row t)
     (if (moin-is-in-list-p)
 	(moin--list-move-subtree-down arg)
       (if (moin-is-on-heading-p)
@@ -486,12 +489,12 @@ use `moin-command-meta-return' instead."
 (defun moin-command-tab (&optional arg)
   "Context-sensitive command that performs different functions based on the
 context:
-* If point is currently in a table, it moves to the next field to the right,
-or to the first field of the next row, if the current field is in the last
-column of the table. If the current field is the last field of the table
-in the right-most column, this command will create a new empty row and put
-point into the left-most field of the new row. If the next field already
-constains text, this command positions point just before the first 
+* If point is currently in a table, it moves to the next table field to
+the right, or to the first field of the next row, if the current field
+is in the last column of the table. If the current field is the last field
+of the table in the right-most column, this command will create a new empty
+row and put point into the left-most field of the new row. If the next field
+already constains text, this command positions point just before the first 
 non-whitespace character of the field. For both the current as well as the
 next field, this command ensures that there is just one blank after the previous
 and before the next column separator after moving to the next field.

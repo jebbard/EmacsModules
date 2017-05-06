@@ -59,35 +59,38 @@
   "Update and fix the prefix and suffix of a heading, essentially replaces
 any combinations of blanks and '=' at the end or beginning of current line
 with a well-formed heading suffix of the given level."
-  (beginning-of-line)
-  (setq heading-pre-suf (make-string updated-heading-level ?=))
-  ;; Fix start of heading
-  (re-search-forward "^[ \t =]*")
-  (replace-match (concat heading-pre-suf " "))
-  ;; Fix end of heading
-  (re-search-forward "[ \t =]*$")
-  (replace-match (concat " " heading-pre-suf)))
+  (let
+      ((heading-pre-suf (make-string updated-heading-level ?=)))
+    (beginning-of-line)
+    ;; Fix start of heading
+    (if (re-search-forward "^[ \t =]*")
+	(replace-match (concat heading-pre-suf " ")))
+    ;; Fix end of heading
+    (if (re-search-forward "[ \t =]*$")
+	(replace-match (concat " " heading-pre-suf)))))
 
 
 (defun moin--heading-determine-level ()
   "Determines the level of the current heading, if any. Returns 0 if currently not
 on a heading"
-  (save-excursion
-    (beginning-of-line)
-    (looking-at "\\(=+\\) ")
-    (setq len (length (match-string 1)))
-    len))
+  (let (len)
+    (save-excursion
+      (beginning-of-line)
+      (looking-at "\\(=+\\) ")
+      (setq len (length (match-string 1)))
+      len)))
 
 
 (defun moin--heading-determine-section-level()
   "Tries to determine the heading level of the current section where point 
 is in. If there is no previous heading, it throws an error."
-  (save-excursion
-    (setq section-level (condition-case nil
-	(progn
-	  (outline-back-to-heading t)
-	  (moin--heading-determine-level))
-	(error 0)))))
+  (let (section-level)
+    (save-excursion
+      (setq section-level (condition-case nil
+			      (progn
+				(outline-back-to-heading t)
+				(moin--heading-determine-level))
+			    (error 0))))))
 
 
 (defun moin--determine-heading-folding-state ()
@@ -100,38 +103,40 @@ headings of the next lower level below the current heading. The child heading
 subtrees remain hidden.
  * SUBTREE: The entire content and subtree below the current heading is 
 shown entirely, no folding"
-  ;; Current headline is FOLDED
-  (if (invisible-p (point-at-eol))
-      "FOLDED"
-    ;; else
-    (save-excursion
+  (let (current-heading-level
+	next-heading-level
+	(is-child-heading t)
+	(has-folded-children nil))
 
-      (setq current-heading-level (moin--heading-determine-level))
+    ;; Current headline is FOLDED
+    (if (invisible-p (point-at-eol))
+	"FOLDED"
+      ;; else
+      (save-excursion
 
-      ;; Check whether at least one direct child heading has an invisible body
-      (setq is-child-heading t)
-      (setq has-folded-children nil)
-      
-      (while (and is-child-heading (not has-folded-children))
-	(progn
-	  ;; Set point to next heading (no matter if visible or not)
-	  (outline-next-heading)
-	  
-	  (if (moin-is-on-heading-p)
-	      (progn 
-		(setq next-heading-level (moin--heading-determine-level)))
-	    ;; else
-	    (setq next-heading-level 0))
+	(setq current-heading-level (moin--heading-determine-level))
 
-	  ;; Current heading has children
-	  (if (eq (+ current-heading-level 1) next-heading-level)
-	      (if (invisible-p (point-at-eol))
-		  (setq has-folded-children t))
-	    (setq is-child-heading nil))))
+	;; Check whether at least one direct child heading has an invisible body
+	(while (and is-child-heading (not has-folded-children))
+	  (progn
+	    ;; Set point to next heading (no matter if visible or not)
+	    (outline-next-heading)
+	    
+	    (if (moin-is-on-heading-p)
+		(progn 
+		  (setq next-heading-level (moin--heading-determine-level)))
+	      ;; else
+	      (setq next-heading-level 0))
 
-      (if has-folded-children
-	  (progn "CHILDREN")
-	"SUBTREE"))))
+	    ;; Current heading has children
+	    (if (eq (+ current-heading-level 1) next-heading-level)
+		(if (invisible-p (point-at-eol))
+		    (setq has-folded-children t))
+	      (setq is-child-heading nil))))
+
+	(if has-folded-children
+	    (progn "CHILDREN")
+	  "SUBTREE")))))
 
 
 (defun moin--heading-move-subtree-up-or-down (&optional arg)
@@ -184,33 +189,36 @@ bugfix code if emacs major version is < 25."
   "Executes a given action on the whole subtree of the current heading, including the current
 heading itself. The function sets point to the start of each of the headings belonging to the
 subtree of the current heading. Must be called only if point is currently on a heading."
-  (if (not (moin-is-on-heading-p))
-      (user-error "Only working on a heading"))
-  (save-excursion
-    (beginning-of-line)
-    ;; Get level of current heading
-    (if (not curr-level)
-	(setq current-heading-level (moin--heading-determine-level))
-      (setq current-heading-level curr-level))
-
-    (if (not initial-level)
-	(setq initial-level current-heading-level))
+  (let (current-heading-level next-heading-level)
     
-    (funcall action current-heading-level)
-
-    ;; Set point to next heading (no matter if visible or not)
-    (outline-next-heading)
+    (if (not (moin-is-on-heading-p))
+	(user-error "Only working on a heading"))
     
-    (if (moin-is-on-heading-p)
-	(progn 
-	  (setq next-heading-level (moin--heading-determine-level)))
-      ;; else
-      (setq next-heading-level 0))
+    (save-excursion
+      (beginning-of-line)
+      ;; Get level of current heading
+      (if (not curr-level)
+	  (setq current-heading-level (moin--heading-determine-level))
+	(setq current-heading-level curr-level))
 
-    ;; Real child found
-    (if (> next-heading-level initial-level)
-	(progn
-	  (moin--heading-execute-action-on-subtree action initial-level next-heading-level)))))
+      (if (not initial-level)
+	  (setq initial-level current-heading-level))
+      
+      (funcall action current-heading-level)
+
+      ;; Set point to next heading (no matter if visible or not)
+      (outline-next-heading)
+      
+      (if (moin-is-on-heading-p)
+	  (progn 
+	    (setq next-heading-level (moin--heading-determine-level)))
+	;; else
+	(setq next-heading-level 0))
+
+      ;; Real child found
+      (if (> next-heading-level initial-level)
+	  (progn
+	    (moin--heading-execute-action-on-subtree action initial-level next-heading-level))))))
 
 
 (defun moin--heading-do-demote(current-level)
@@ -240,39 +248,42 @@ special characteristics of MoinMoin headings: They are enclosed by '=' signs.
 Unfortunately, outline-mode does not support this, i.e. it only demotes the 
 prefix of the heading, leaving the suffix unchanged. Thus, moin-mode itself needs 
 to take care of also demoting or promoting the rest of the heading."
-  (save-excursion
-    (if mark-active
-	(user-error "Command not supported if mark is active"))
-    (setq current-heading-level (moin--heading-determine-level))
-    (setq current-column (current-column))
-    
-    (if including-subtree
-	(moin--heading-execute-action-on-subtree change-func)
-      (funcall change-func current-heading-level))
+  (let (current-heading-level current-column)
 
-    ;; Ensure point is at the right position after the command
-    (if (<= current-column current-heading-level)
-	(beginning-of-line)
-      (move-to-column (+ current-column column-change)))))
+    (save-excursion
+      (if mark-active
+	  (user-error "Command not supported if mark is active"))
+      (setq current-heading-level (moin--heading-determine-level))
+      (setq current-column (current-column))
+      
+      (if including-subtree
+	  (moin--heading-execute-action-on-subtree change-func)
+	(funcall change-func current-heading-level))
+
+      ;; Ensure point is at the right position after the command
+      (if (<= current-column current-heading-level)
+	  (beginning-of-line)
+	(move-to-column (+ current-column column-change))))))
 
 
 (defun moin--heading-outline-cycle (&optional arg)
   "Implements outline cycle, see `' for more details."
   (interactive "p")
-  (if (moin-is-on-heading-p)
-      (progn
-	(setq folding-state (moin--determine-heading-folding-state))
-	
-        (cond ((string= "FOLDED" folding-state)
-	       (show-entry)
-	       (show-children)
-	       (message "CHILDREN"))
-	      ((string= "CHILDREN" folding-state)
-	       (show-subtree)
-	       (message "SUBTREE"))
-	      ((string= "SUBTREE" folding-state)
-	       (hide-subtree)
-	       (message "FOLDED"))))))
+  (let (folding-state)
+    (if (moin-is-on-heading-p)
+	(progn
+	  (setq folding-state (moin--determine-heading-folding-state))
+	  
+	  (cond ((string= "FOLDED" folding-state)
+		 (show-entry)
+		 (show-children)
+		 (message "CHILDREN"))
+		((string= "CHILDREN" folding-state)
+		 (show-subtree)
+		 (message "SUBTREE"))
+		((string= "SUBTREE" folding-state)
+		 (hide-subtree)
+		 (message "FOLDED")))))))
 
 
 (defun moin--heading-create (level &optional text)
@@ -292,97 +303,107 @@ after the heading prefix"
 (defun moin--heading-insert (&optional arg)
   "Inserts a new heading before or behind the current one, see 
 `moin-command-meta-return' for details."
-  (if (moin-is-on-heading-p)
+  (let (current-heading-level new-heading-text)
+    
+    (if (moin-is-on-heading-p)
+	(progn
+	  (setq current-heading-level (moin--heading-determine-level))
+	  
+	  ;; Insert new heading before current one
+	  (if (eq (current-column) 0)
+	      (moin--heading-create current-heading-level)
+	    ;; Insert new heading with no content after current one, if
+	    ;; point is within heading delimiters (at beginning or end)
+	    (progn
+	      (if (or (<= (current-column) (+ current-heading-level 1))
+		      (<= (- (point-at-eol) (point)) (+ current-heading-level 1)))
+		  (setq new-heading-text "")
+		;; Otherwise just split current heading text to new heading
+		(progn
+		  (setq new-heading-text
+			(buffer-substring-no-properties (point)
+							(- (point-at-eol) current-heading-level 1)))
+		  (delete-region (point) (- (point-at-eol) current-heading-level 1))))
+	      (end-of-line)
+	      (newline)
+	      (moin--heading-create current-heading-level new-heading-text))))
       (progn
-        (setq current-heading-level (moin--heading-determine-level))
-	
-	;; Insert new heading before current one
-	(if (eq (current-column) 0)
-	    (moin--heading-create current-heading-level)
-          ;; Insert new heading with no content after current one, if
-	  ;; point is within heading delimiters (at beginning or end)
-	  (progn
-	    (if (or (<= (current-column) (+ current-heading-level 1))
-		    (<= (- (point-at-eol) (point)) (+ current-heading-level 1)))
-		(setq new-heading-text "")
-	      ;; Otherwise just split current heading text to new heading
-	      (progn
-		(setq new-heading-text (buffer-substring-no-properties (point) (- (point-at-eol) current-heading-level 1)))
-		(delete-region (point) (- (point-at-eol) current-heading-level 1))))
-	    (end-of-line)
-	    (newline)
-	    (moin--heading-create current-heading-level new-heading-text))))
-    (progn
-      (setq current-heading-level (moin--heading-determine-section-level))
+	(setq current-heading-level (moin--heading-determine-section-level))
 
-      (if (eq current-heading-level 0)
-	  (setq current-heading-level 1))
-      
-      (newline)
-      (moin--heading-create current-heading-level))))
+	(if (eq current-heading-level 0)
+	    (setq current-heading-level 1))
+	
+	(newline)
+	(moin--heading-create current-heading-level)))))
 
 
 (defun moin--heading-insert-respect-content (&optional arg)
   "See `moin-command-insert-heading-respect-content' for details."
-  (setq current-heading-level (moin--heading-determine-section-level))
+  (let (current-heading-level
+	next-heading-level
+	might-have-further-child-headings-p
+	initial-point
+	current-point)
 
-  ;; When there is no heading before point: search for the next heading
-  ;; or the end of the current buffer
-  (if (eq current-heading-level 0)
-      (progn
-	(outline-next-heading)
-	(if (moin-is-on-heading-p)
-	    (setq current-heading-level (moin--heading-determine-level))
-	  (progn
-	    (setq current-heading-level 1)
-	    (end-of-buffer)
-	    (if (not (looking-at "^$"))
-		(newline))))
-	(moin--heading-create current-heading-level))
-    (progn
+    (setq current-heading-level (moin--heading-determine-section-level))
 
-      (if (and (moin-is-on-heading-p) (bolp))
-	  (moin--heading-create current-heading-level)
+    ;; When there is no heading before point: search for the next heading
+    ;; or the end of the current buffer
+    (if (eq current-heading-level 0)
 	(progn
-	  (setq might-have-further-child-headings-p t)
-	  (end-of-line)
+	  (outline-next-heading)
+	  (if (moin-is-on-heading-p)
+	      (setq current-heading-level (moin--heading-determine-level))
+	    (progn
+	      (setq current-heading-level 1)
+	      (end-of-buffer)
+	      (if (not (looking-at "^$"))
+		  (newline))))
+	  (moin--heading-create current-heading-level))
+      (progn
 
-	  (setq initial-point (point))
-	  (setq current-point nil)
+	(if (and (moin-is-on-heading-p) (bolp))
+	    (moin--heading-create current-heading-level)
+	  (progn
+	    (setq might-have-further-child-headings-p t)
+	    (end-of-line)
 
-          ;; If point remains where it is, there is actually no next heading
-          ;; and we need to terminate the loop
-	  (while might-have-further-child-headings-p
-	    (setq current-point (point))
-	    
-	    (outline-next-heading)
+	    (setq initial-point (point))
+	    (setq current-point nil)
 
-	    (if (eq current-point (point))
-		(progn
-		  (setq next-heading-level (moin--heading-determine-level))
-		  (setq might-have-further-child-headings-p nil))
-	      (progn
-		(if (moin-is-on-heading-p)
+	    ;; If point remains where it is, there is actually no next heading
+	    ;; and we need to terminate the loop
+	    (while might-have-further-child-headings-p
+	      (setq current-point (point))
+	      
+	      (outline-next-heading)
+
+	      (if (eq current-point (point))
+		  (progn
 		    (setq next-heading-level (moin--heading-determine-level))
-		  (setq next-heading-level 0))
-		(setq might-have-further-child-headings-p (> next-heading-level current-heading-level)))))
+		    (setq might-have-further-child-headings-p nil))
+		(progn
+		  (if (moin-is-on-heading-p)
+		      (setq next-heading-level (moin--heading-determine-level))
+		    (setq next-heading-level 0))
+		  (setq might-have-further-child-headings-p (> next-heading-level current-heading-level)))))
 
-	  (end-of-line)
+	    (end-of-line)
 
-	  ;; After the while loop, there are four cases that could be distinguished:
-	  ;; (1) Point has not moved at all --> Heading has no children nor siblings, go to eob
-	  ;; (2) Point is on a child heading --> go to eob
-	  ;; (3) Pathetic case that point is not on a heading --> go to eob
-	  ;; (4) Nothing of the above, which means point is on a sibling heading
-	  (if (or (and (moin-is-on-heading-p) (> (moin--heading-determine-level) current-heading-level))
-		  (not (moin-is-on-heading-p))
-		  (and (moin-is-on-heading-p) (eq initial-point (point))))
-	      (progn
-		(end-of-buffer)
-		(if (not (looking-at "^$"))
-		    (newline))))
+	    ;; After the while loop, there are four cases that could be distinguished:
+	    ;; (1) Point has not moved at all --> Heading has no children nor siblings, go to eob
+	    ;; (2) Point is on a child heading --> go to eob
+	    ;; (3) Pathetic case that point is not on a heading --> go to eob
+	    ;; (4) Nothing of the above, which means point is on a sibling heading
+	    (if (or (and (moin-is-on-heading-p) (> (moin--heading-determine-level) current-heading-level))
+		    (not (moin-is-on-heading-p))
+		    (and (moin-is-on-heading-p) (eq initial-point (point))))
+		(progn
+		  (end-of-buffer)
+		  (if (not (looking-at "^$"))
+		      (newline))))
 	    
-	  (moin--heading-create current-heading-level))))))
+	    (moin--heading-create current-heading-level)))))))
 
 
 ;; ==================================================

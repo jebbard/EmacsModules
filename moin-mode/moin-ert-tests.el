@@ -575,7 +575,8 @@ Expectations are given in the list form (current-column (start-point end-point c
   (test-moin--check-table-determine-column-details "||	 ||  ||" 10 (list 2 (list 3 5 "	 ") (list 7 9 "  ")))
   (test-moin--check-table-determine-column-details "||	 ||  ||" 11 (list 2 (list 3 5 "	 ") (list 7 9 "  ")))
   (test-moin--check-table-determine-column-details "||	 ||  ||" 6 (list 1 (list 3 5 "	 ") (list 7 9 "  ")))
-  (test-moin--check-table-determine-column-details "||	 ||  ||" 10 (list 2 (list 3 5 "	 ") (list 7 9 "  "))))
+  (test-moin--check-table-determine-column-details "||	 ||  ||" 10 (list 2 (list 3 5 "	 ") (list 7 9 "  ")))
+  (test-moin--check-table-determine-column-details "|| a |||| b ||\n|| c || || ||\nAny Text behind" 16 (list 1 (list 18 21 " c ") (list 23 24 " ") (list 26 27 " "))))
 
 
 (defun test-moin--check-table-determine-column-details (text start-point expected-details)
@@ -588,33 +589,37 @@ Expectations are given in the list form (current-column (start-point end-point c
 
 
 (ert-deftest test-moin--table-next-field ()
-  "Tests `moin--table-next-field' in positive cases"
+  "Tests `moin-command-tab' and `moin--table-next-field' in positive cases"
   ;; Just move to the next field of the same row, without any buffer changes
-  ;; (test-moin--table-next-field-positive "||  ||  ||" 4 8)
-  ;; (test-moin--table-next-field-positive "||  ||  ||" 3 8)
-  ;;(test-moin--table-next-field-positive "|| my text || another text ||  ||" 6 15)
-  ;;(test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 31 34)
-  ;; ;; Special case: Point before first field
-  ;; (test-moin--table-next-field-positive "||  ||  ||" 2 4)
-  ;; (test-moin--table-next-field-positive "||  ||  ||" 1 4)
-  ;; ;; Move point to next line if in last column, without any buffer changes
-  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 15 23)
-  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 16 23)
-  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 17 23)
-  ;; ;; Special case: Point after last field of a line
-  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 18 23)
-  ;; (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 19 23)
-  ;; ;; Table whitespace corrections
-  ;; (test-moin--table-next-field-positive "|| || ||" 3 8 "||  ||  ||")
-  ;; (test-moin--table-next-field-positive "||  ||||" 4 8 "||  ||  ||")
-  ;; (test-moin--table-next-field-positive "||||||" 4 8 "||  ||  ||")
-  ;; (test-moin--table-next-field-positive "|| my text||a ||\n||bbbbbbb|| cccc ||" 15 23
-  ;; 					"|| my text|| a ||\n|| bbbbbbb || cccc ||")
-  ;; (test-moin--table-next-field-positive "|| my text ||another text ||" 6 15 "|| my text || another text ||")
-  ;; (test-moin--table-next-field-positive "|| my text || another text||" 6 15 "|| my text || another text ||")
-  ;; ;; Create new line if issued in last field of table
-  ;; (test-moin--table-next-field-positive "||  ||" 4 11 "||  ||\n||  ||")
-  ;; (test-moin--table-next-field-positive "|| a |||| b ||\n|| c || || ||\nAny Text behind" 26 34 "|| a |||| b ||\n|| c || ||  ||\n||  ||  ||  ||\nAny Text behind")
+  (test-moin--table-next-field-positive "||  ||  ||" 4 8)
+  (test-moin--table-next-field-positive "||  ||  ||" 3 8)
+  (test-moin--table-next-field-positive "|| my text || another text ||  ||" 6 15)
+  (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 31 34)
+  ;; Special case: Point before first field
+  (test-moin--table-next-field-positive "||  ||  ||" 2 4)
+  (test-moin--table-next-field-positive "||  ||  ||" 1 4)
+  ;; Move point to next line if in last column, without any buffer changes
+  (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 15 23)
+  (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 16 23)
+  (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 17 23)
+  ;; Special case: Point after last field of a line
+  (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 18 23)
+  (test-moin--table-next-field-positive "|| my text || a ||\n|| bbbbbbb || cccc ||" 19 23)
+  ;; Table whitespace corrections
+  (test-moin--table-next-field-positive "|| || ||" 3 8 "||  ||  ||")
+  (test-moin--table-next-field-positive "||  ||||" 4 8 "||  ||  ||")
+  (test-moin--table-next-field-positive "||||||" 4 8 "||  ||  ||")
+  (test-moin--table-next-field-positive "||  ||||" 1 4 "||  ||||")
+  (test-moin--table-next-field-positive "|||| ||" 2 4 "||  || ||")
+  (test-moin--table-next-field-positive "|| my text||a ||\n||bbbbbbb|| cccc ||" 15 22
+   					"|| my text|| a ||\n|| bbbbbbb || cccc ||")
+  (test-moin--table-next-field-positive "|| my text ||another text ||" 6 15 "|| my text || another text ||")
+  (test-moin--table-next-field-positive "|| my text || another text||" 6 15 "|| my text || another text ||")
+  (test-moin--table-next-field-positive "|| myt||a ||\n||bbbbbbb||cc  cc      ||\n||  	  	f || ||" 34 39
+   					"|| myt||a ||\n||bbbbbbb|| cc  cc ||\n|| f || ||")
+  ;; Create new line if issued in last field of table
+  (test-moin--table-next-field-positive "||  ||" 4 11 "||  ||\n||  ||\n")
+  (test-moin--table-next-field-positive "|| a |||| b ||\n|| c || || ||\nAny Text behind" 26 34 "|| a |||| b ||\n|| c || ||  ||\n||  ||  ||  ||\nAny Text behind")
   )
 
 
@@ -623,7 +628,7 @@ Expectations are given in the list form (current-column (start-point end-point c
     (moin-mode)
     (insert text)
     (goto-char start-point)
-    (moin--table-next-field)
+    (moin-command-tab)
     (message "test-moin--moin--table-next-field buffer string after funcall: %s" (buffer-string))
     
     (if expected-buffer
@@ -631,6 +636,40 @@ Expectations are given in the list form (current-column (start-point end-point c
       (should (equal text (buffer-string))))
     
     (should (equal expected-point (point)))))
+
+
+(ert-deftest test-moin--table-insert-row ()
+  "Tests `moin--table-insert-row'"
+  ;; Inserting rows behind current row
+  (test-moin--check-table-insert-row "|| ||" 1 'moin--table-insert-row nil "||  ||")
+  (test-moin--check-table-insert-row "||||aaa ||" 9 'moin--table-insert-row nil "||  ||  ||")
+  (test-moin--check-table-insert-row "||a||b||c||d||     e ||" 22 'moin--table-insert-row nil "||  ||  ||  ||  ||  ||")
+  ;; Inserting rows before current row (direct call)
+  (test-moin--check-table-insert-row "|| ||" 1 'moin--table-insert-row t "||  ||")
+  (test-moin--check-table-insert-row "||||aaa ||" 9 'moin--table-insert-row t "||  ||  ||")
+  (test-moin--check-table-insert-row "||a||b||c||d||     e ||" 22 'moin--table-insert-row t "||  ||  ||  ||  ||  ||")
+  ;; Inserting rows before current row (command call)
+  (test-moin--check-table-insert-row "|| ||" 1 'moin-command-meta-shift-down t "||  ||")
+  (test-moin--check-table-insert-row "||||aaa ||" 9 'moin-command-meta-shift-down t "||  ||  ||")
+  (test-moin--check-table-insert-row "||a||b||c||d||     e ||" 22 'moin-command-meta-shift-down t "||  ||  ||  ||  ||  ||"))
+
+
+(defun test-moin--check-table-insert-row (text start-point func insert-before-p expected-new-row)
+  (with-temp-buffer
+    (moin-mode)
+    (insert text)
+    (goto-char start-point)
+    (funcall func insert-before-p)
+    (message "test-moin--check-table-insert-row buffer string after funcall: %s" (buffer-string))
+
+    (if insert-before-p
+	(progn
+	  (should (equal (concat expected-new-row "\n" text) (buffer-string)))
+	  (should (equal 4 (point))))
+      (progn
+	(should (equal (concat text "\n" expected-new-row) (buffer-string)))
+	(should (equal (+ (length text) 5) (point)))))))
+
 
 ;; ==================================================
 ;; Testing list functions

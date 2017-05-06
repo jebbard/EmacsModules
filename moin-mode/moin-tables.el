@@ -27,6 +27,9 @@
 ;;; Code
 
 
+;; Required for string trimming functions (since Emacs 24.4)
+(require 'subr-x)
+
 ;; ==================================================
 ;; Constants
 
@@ -88,12 +91,81 @@ function if point is currently not in a table."
   "See `moin-command-tab' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (if (> current-column 1)
-      (progn
-	(re-search-forward (regexp-quote moin-const-table-delimiter))
-;; TODO implement
-	)
-    ))
+  (let
+      (column-details
+       next-column-details
+       current-table-column
+       current-column-info
+       next-column-info
+       next-start-point
+       next-end-point
+       next-col-text
+       column-length-change)
+
+    (setq column-details (moin--table-determine-column-details))
+    (setq current-table-column (car column-details))
+    (setq current-column-info (nth (- current-table-column 1) (cdr column-details)))
+    
+    ;; If we are before the first field, we have to move there
+    (if (< (current-column) 2)
+	(progn
+	  (moin--table-fix-field current-column-info)
+	  (setq next-column-info current-column-info)
+	  (setq next-start-point (car next-column-info))
+	  (goto-char (+ next-start-point 1)))
+      ;; If we are in fields 1 to N-1, we have to move to the next
+      ;; column in the current row
+      (if (< current-table-column (length (cdr column-details)))
+	  (progn
+	    (moin--table-fix-field current-column-info)
+	    ;; Update column details, as the fix might have moved the next column
+            (setq next-column-details (moin--table-determine-column-details))
+	    (setq next-column-info (nth current-table-column (cdr next-column-details)))
+	    (moin--table-fix-field next-column-info)
+	    (setq next-start-point (car next-column-info))
+	    (goto-char (+ next-start-point 1)))
+        ;; If we are in field N, we have to move to the first
+        ;; column in the next row, if any
+	(if (eq current-table-column (length (cdr column-details)))
+	    (progn
+              (moin--table-fix-field current-column-info)
+	      (end-of-line)
+	      
+	      (if (eobp)
+		  (newline)
+		(next-line))
+
+	      (if (not (moin-is-in-table-p))
+		  (progn
+		    (previous-line)
+		    (moin--table-insert-row nil)
+		    (move-to-column 3))
+		(progn
+		  (setq next-column-details (moin--table-determine-column-details))
+		  (setq next-column-info (car (cdr next-column-details)))
+		  (moin--table-fix-field next-column-info)
+		  (setq next-start-point (car next-column-info))
+		  (goto-char (+ next-start-point 1))))))))))
+
+
+(defun moin--table-fix-field (column-info)
+  "Fixes the content of a field by ensuring it starts and ends with a single
+blank. Expects a column info list with start-point of column as first element,
+end-point of column as second and column-text as third element. Returns the 
+number of characters by which the length of the column has changed after the
+fix."
+  (let ((start-point (car column-info))
+    (end-point (car (cdr column-info)))
+    (column-text (car (cdr (cdr column-info))))
+    new-column-text)
+
+    (setq new-column-text (concat " " (string-trim column-text) " "))
+    (goto-char start-point)
+
+    (if (re-search-forward (regexp-quote column-text) (point-at-eol) t)
+	(replace-match new-column-text nil nil))
+
+    (- (length new-column-text) (length column-text))))
 
 
 (defun moin--table-move-column-right (&optional arg)
@@ -138,11 +210,36 @@ function if point is currently not in a table."
   (user-error "Not implemented yet for tables!"))
 
 
-(defun moin--table-insert-row (&optional arg)
+(defun moin--table-insert-row (insert-before-p)
   "See `moin-command-meta-shift-down' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+function if point is currently not in a table. If insert-before-p is
+t, the new row is inserted before the current row, otherwise it is
+inserted after the current row. In any case, it inserts a row with
+the same number of columns as the current row. Point will not be
+affected by this function."
+  (let
+      (column-details column-count)
+
+    (setq column-details (moin--table-determine-column-details))
+    (setq column-count (- (length column-details) 1))
+
+    (if insert-before-p
+	(progn
+	  (beginning-of-line)
+	  (newline)
+	  (previous-line))
+      (progn
+	(end-of-line)
+	(newline)))
+
+    (insert moin-const-table-delimiter)
+
+    (dotimes (i column-count)
+      (insert "  ")
+      (insert moin-const-table-delimiter))
+    
+    (move-to-column 3)))
 
 
 (defun moin--table-remove-row (&optional arg)
@@ -173,78 +270,87 @@ point value after the last character directly before '||', i.e. where the column
 and 'content' is the actual string content of the column, including any enclosing
 whitespace, but without the column delimiters '||'."
   (interactive)
-  (setq column-regex
-	(concat moin-const-quoted-table-delimiter
-		"\\(.*?\\)" moin-const-quoted-table-delimiter))
-  (setq column-delimiter-size (length moin-const-table-delimiter))
-  
-  (save-excursion
-    (setq initial-point (point))
-    (beginning-of-line)
-    (setq current-column 1)
-    (setq return-list (list))
-
-    (while (and (looking-at column-regex) (< (+ (point) column-delimiter-size) (point-at-eol)))
-      (setq start-point (match-beginning 1))
-
-      ;; Special case: Point is exactly in the middle of the table delimiter '||'
-      ;; i.e. behind previous field end point and before next field start point
-      (if (and (> current-column 1) (> initial-point end-point) (< initial-point start-point))
-	  (add-to-list 'return-list (- current-column 1)))
-      
-      (setq end-point (match-end 1))
-      (setq content (match-string 1))
-
-      (if (and (>= initial-point start-point) (<= initial-point end-point))
-	  (add-to-list 'return-list current-column))
-
-      (setq column-details (list start-point end-point content))
-      (setq return-list (append return-list (list column-details)))
-      (goto-char end-point)
-      (setq current-column (+ current-column 1)))
+  (let
+      ((column-regex (concat moin-const-quoted-table-delimiter
+			     "\\(.*?\\)" moin-const-quoted-table-delimiter))
+       (column-delimiter-size (length moin-const-table-delimiter))
+       (current-column 1)
+       (return-list (list))
+       (initial-point (point))
+       (start-point nil)
+       (end-point nil)
+       (content nil)
+       (column-details nil))
     
-    (if (< initial-point 3)
-	(add-to-list 'return-list 1)
-      (if (> initial-point (- (point-at-eol) 2))
-	  (add-to-list 'return-list (- current-column 1)))))
+    (save-excursion
+      (beginning-of-line)
 
-  return-list)
+      (while (and (looking-at column-regex) (< (+ (point) column-delimiter-size) (point-at-eol)))
+	(setq start-point (match-beginning 1))
+
+	;; Special case: Point is exactly in the middle of the table delimiter '||'
+	;; i.e. behind previous field end point and before next field start point
+	(if (and (> current-column 1) (> initial-point end-point) (< initial-point start-point))
+	    (add-to-list 'return-list (- current-column 1)))
+	
+	(setq end-point (match-end 1))
+	(setq content (match-string 1))
+
+	(if (and (>= initial-point start-point) (<= initial-point end-point))
+	    (add-to-list 'return-list current-column))
+
+	(setq column-details (list start-point end-point content))
+	(setq return-list (append return-list (list column-details)))
+	(goto-char end-point)
+	(setq current-column (+ current-column 1)))
+
+      (if (< (- initial-point (point-at-bol)) 2)
+	  (add-to-list 'return-list 1)
+	(if (> initial-point (- (point-at-eol) 2))
+	    (add-to-list 'return-list (- current-column 1)))))
+
+    return-list))
 
 
 (defun moin--table-create (table-size-string)
-  (setq error-message (concat "Invalid table size format specified, should be Columns x Rows [e.g. " moin-const-table-default-size "]"))
+  "Creates a new table with the given table-size-string. If the string is 
+malformed, it throws a user-error."
+  (let
+      ((error-message (concat
+		       "Invalid table size format specified, should be Columns x Rows [e.g. "
+		       moin-const-table-default-size "]"))
+       (table-size-list (split-string table-size-string "x" t nil))
+       cols, rows, point-before-table)
 
-  (setq table-size-list (split-string table-size-string "x" t nil))
+    (if (not (eq (length table-size-list) 2))
+	(user-error error-message))
 
-  (if (not (eq (length table-size-list) 2))
-      (user-error error-message))
+    (setq cols (string-to-number (car table-size-list)))
+    (setq rows (string-to-number (car (cdr table-size-list))))
 
-  (setq cols (string-to-number (car table-size-list)))
-  (setq rows (string-to-number (car (cdr table-size-list))))
+    ;; This includes the case of invalid row or column string
+    (if (or (< cols 1) (< rows 1))
+	(user-error error-message))
 
-  ;; This includes the case of invalid row or column string
-  (if (or (< cols 1) (< rows 1))
-      (user-error error-message))
-
-  (if (bolp)
+    (if (bolp)
+	(progn
+	  (newline)
+	  (previous-line))
       (progn
+	(end-of-line)
 	(newline)
-	(previous-line))
-    (progn
-      (end-of-line)
-      (newline)
-      (newline)))
+	(newline)))
 
-  (setq point-before-table (point))
-  
-  (dotimes (row rows)
-    (dotimes (col cols)
+    (setq point-before-table (point))
+    
+    (dotimes (row rows)
+      (dotimes (col cols)
+	(insert moin-const-table-delimiter)
+	(insert "  "))
       (insert moin-const-table-delimiter)
-      (insert "  "))
-    (insert moin-const-table-delimiter)
-    (newline))
+      (newline))
 
-  (goto-char (+ point-before-table 3)))
+    (goto-char (+ point-before-table 3))))
 
 
 ;; ==================================================

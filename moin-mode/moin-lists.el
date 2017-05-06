@@ -44,16 +44,18 @@ blank lines or lines with only whitespaces between two list items. Furthermore,
 as soon as there is at least one blank or tab at the beginning of a line, it is 
 considered to belong to a list, if a previous line contains a list. Only lines 
 with a non-whitespace character as first character of the line break the list."
-  (save-excursion
-    (beginning-of-line)
-    ;; This match string usually only covers the first line of an item! The sole case
-    ;; where it spans two lines is that after the 
-    (setq list-regex
-	  "^\\([\t ]+\\)\\([*.]\\|\\([1-9]+\\|[A-Za-z]\\)\\.\\)\\([\t ]*\\)\\([^[:space:]].*?$\\|$\\)")
-    (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not (bobp)))
-      (previous-line)
-      (beginning-of-line))
-    (looking-at list-regex)))
+  (let ((list-regex
+	 "^\\([\t ]+\\)\\([*.]\\|\\([1-9]+\\|[A-Za-z]\\)\\.\\)\\([\t ]*\\)\\([^[:space:]].*?$\\|$\\)"))
+    
+    (save-excursion
+      (beginning-of-line)
+      ;; This match string usually only covers the first line of an item! The sole case
+      ;; where it spans two lines is that after the 
+      (setq )
+      (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not (bobp)))
+	(previous-line)
+	(beginning-of-line))
+      (looking-at list-regex))))
 
 
 ;; ==================================================
@@ -73,6 +75,7 @@ item text starts
 * whitespace-before contains any whitespace before the starting bullet or number
 * starting-bullet contains the text of the starting bullet or number without any 
 whitespace, including a trailing dot for numbers"
+(let (start-pos preamble-end-pos whitespace-before-bullet whitespace-after-bullet starting-bullet)
   (unless (moin-is-in-list-p)
     (user-error "Not in list currently"))
 
@@ -84,40 +87,47 @@ whitespace, including a trailing dot for numbers"
   (setq whitespace-after-bullet (match-string 4))
   (setq starting-bullet (match-string 2))
 
-  (list start-pos preamble-end-pos whitespace-before-bullet starting-bullet whitespace-after-bullet))
+  (list start-pos preamble-end-pos whitespace-before-bullet starting-bullet whitespace-after-bullet)))
 
 
 (defun moin--list-insert-item-same-level (&optional arg)
   "See `moin-command-meta-return' for more information.
 Expects to actually be in a list as prerequisite. Never call this 
 function if point is currently not in a list."
-  (unless (moin-is-in-list-p)
-    (user-error "Not in list currently"))
+  (let (item-start-pos
+	item-preamble-end-pos
+	item-whitespace-before
+	item-starting-bullet
+	item-whitespace-after
+	item-info)
 
-  (setq item-info (moin--list-get-item-info))
-  
-  (setq current-item-start-pos (car item-info))
-  (setq current-item-preamble-end-pos (car (cdr item-info)))
-  (setq current-item-whitespace-before (car (cdr (cdr item-info))))
-  (setq current-item-starting-bullet (car (cdr (cdr (cdr item-info)))))
-  (setq current-item-whitespace-after (car (cdr (cdr (cdr (cdr item-info))))))
+    (unless (moin-is-in-list-p)
+      (user-error "Not in list currently"))
 
-  (if (>= current-item-preamble-end-pos (point))
-      ;; Item text starts after point -> Insert new item in front of current
+    (setq item-info (moin--list-get-item-info))
+    
+    (setq item-start-pos (car item-info))
+    (setq item-preamble-end-pos (car (cdr item-info)))
+    (setq item-whitespace-before (car (cdr (cdr item-info))))
+    (setq item-starting-bullet (car (cdr (cdr (cdr item-info)))))
+    (setq item-whitespace-after (car (cdr (cdr (cdr (cdr item-info))))))
+
+    (if (>= item-preamble-end-pos (point))
+	;; Item text starts after point -> Insert new item in front of current
+	(progn
+	  (beginning-of-line)
+	  (insert item-whitespace-before)
+	  (insert item-starting-bullet)
+	  (insert item-whitespace-after)
+	  (newline)
+	  (previous-line)
+	  (end-of-line))
+      ;; Item text starts before point -> Split item and insert new item after current
       (progn
-	(beginning-of-line)
-	(insert current-item-whitespace-before)
-	(insert current-item-starting-bullet)
-	(insert current-item-whitespace-after)
 	(newline)
-	(previous-line)
-	(end-of-line))
-    ;; Item text starts before point -> Split item and insert new item after current
-    (progn
-      (newline)
-      (insert current-item-whitespace-before)
-      (insert current-item-starting-bullet)
-      (insert current-item-whitespace-after))))
+	(insert item-whitespace-before)
+	(insert item-starting-bullet)
+	(insert item-whitespace-after)))))
 
 
 (defun moin--list-insert-item (list-string)
