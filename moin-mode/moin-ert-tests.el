@@ -71,13 +71,14 @@ the given expected location."
     (moin-mode)
     (insert initial-text)
     (goto-char initial-point)
-    (funcall command args)
 
     ;; Set the region before executing the command
     (if region-size
 	(progn
 	  (set-mark-command nil)
 	  (forward-char region-size)))
+    
+    (funcall command args)
     
     (should (equal expected-point (point)))
     (should (equal expected-buffer (buffer-string)))))
@@ -605,7 +606,10 @@ Expectations are given in the list form (current-column (start-point end-point c
   ;; Check with any regexp special chars in the field text
   (test-moin--check-fix-field 1 " Te.*st " "NewText" " NewText ")
   (test-moin--check-fix-field 1 " Te.*st " nil " Te.*st " " thirst ||")
-  (test-moin--check-fix-field 1 " T\\(.*\\)t " "New\\1Text" " New\\1Text "))
+  (test-moin--check-fix-field 1 " T\\(.*\\)t " "New\\1Text" " New\\1Text ")
+  ;; Check with currently empty field text
+  (test-moin--check-fix-field 1 "" nil "  ")
+  (test-moin--check-fix-field 1 "" "NewText" " NewText "))
 
 
 (defun test-moin--check-fix-field (initial-point initial-field-text changed-field-text
@@ -623,6 +627,49 @@ Expectations are given in the list form (current-column (start-point end-point c
 
     (moin--table-fix-field
      (list 3 (+ 3 (length initial-field-text)) initial-field-text) changed-field-text)
+    
+    (should (equal expected-buffer-text (buffer-string)))
+    (should (equal (- (length expected-buffer-text) (length remaining-buffer-text) 1) (point)))))
+
+
+(ert-deftest test-moin--table-fix-field2 ()
+  "Tests `moin--table-fix-field2'"
+  ;; Check that text is not changed
+  (test-moin--check-fix-field2 1 " Test " nil " Test ")
+  ;; Check without blanks
+  (test-moin--check-fix-field2 1 "Test" nil " Test ")
+  ;; Check with more or less blanks/tabs
+  (test-moin--check-fix-field2 1 " Test" nil " Test ")
+  (test-moin--check-fix-field2 1 "Test " nil " Test ")
+  (test-moin--check-fix-field2 1 "  Test " nil " Test ")
+  (test-moin--check-fix-field2 1 " 		 Test 	" nil " Test ")
+  ;; Check with changed text
+  (test-moin--check-fix-field2 1 " Test " "NewText" " NewText ")
+  (test-moin--check-fix-field2 1 "Test	 " "NewText" " NewText ")
+  ;; Check with any regexp special chars in the field text
+  (test-moin--check-fix-field2 1 " Te.*st " "NewText" " NewText ")
+  (test-moin--check-fix-field2 1 " Te.*st " nil " Te.*st " " thirst ||")
+  (test-moin--check-fix-field2 1 " T\\(.*\\)t " "New\\1Text" " New\\1Text ")
+  ;; Check with currently empty field text
+  (test-moin--check-fix-field2 1 "" nil "  ")
+  (test-moin--check-fix-field2 1 "" "NewText" " NewText "))
+
+
+(defun test-moin--check-fix-field2 (initial-point initial-field-text changed-field-text
+						 expected-field-text &optional remaining-buffer-text)
+  (with-temp-buffer
+    (moin-mode)
+    (setq initial-buffer-text
+	  (concat moin-const-table-delimiter initial-field-text moin-const-table-delimiter
+		  remaining-buffer-text))
+    (setq expected-buffer-text
+	  (concat moin-const-table-delimiter expected-field-text moin-const-table-delimiter
+		  remaining-buffer-text))
+    (insert initial-buffer-text)
+    (goto-char initial-point)
+
+    (moin--table-fix-field2
+     (list 2 (+ 2 (length initial-field-text)) initial-field-text) changed-field-text)
     
     (should (equal expected-buffer-text (buffer-string)))
     (should (equal (- (length expected-buffer-text) (length remaining-buffer-text) 1) (point)))))
@@ -738,7 +785,10 @@ Expectations are given in the list form (current-column (start-point end-point c
       "|| ab ||\n|| xy ||" 9 10 "|| ab ||\n\n|| xy ||")
   (test-moin--command-at-point-changes-buffer 'moin-command-table-next-row
       "|| ab ||\n|| xy ||" 10 11 "|| ab ||\n\n|| xy ||")
-  )
+  ;; Check with active region
+  (test-moin--command-at-point-changes-buffer 'moin-command-table-next-row
+      "|| abc||def ||\n|| || gef||\nAny Text" 10 23
+      "|| abc|| def ||\n|| || gef ||\nAny Text" 2))
 
 
 (ert-deftest test-moin--table-next-row-error ()
@@ -773,11 +823,15 @@ Expectations are given in the list form (current-column (start-point end-point c
       "|| ab ||    ||\n|| ab ||  ||\nAny other text")
   (test-moin--command-at-point-changes-buffer 'moin-command-table-copy-down
       "||      ab || bap||\nAny other text" 15 29
-      "||      ab || bap ||\n||  || bap ||\nAny other text"))
+      "||      ab || bap ||\n||  || bap ||\nAny other text")
+  ;; Check with active region
+  (test-moin--command-at-point-changes-buffer 'moin-command-table-copy-down
+      "|| abc||def ||\n|| || gef||\nAny Text" 10 23
+      "|| abc|| def ||\n|| || def ||\nAny Text" 2))
 
 
 (ert-deftest test-moin--table-copy-down-error ()
-  "Tests `moin-command-table-copy-down' in error situations"
+   "Tests `moin-command-table-copy-down' in error situations"
   ;; Malformed next row
   (test-moin--command-at-point-expects-error
    'moin-command-table-copy-down "|| abc||def ||\n|| ||" 'user-error  10)
@@ -794,43 +848,45 @@ Expectations are given in the list form (current-column (start-point end-point c
   ;; and fixes previous field
   (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
       "|| ab ||\n||||" 6 13 "|| ab ||\n||  ||")
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "|| ||\n|| ||" 4 11 "||  ||\n||  ||")
-  ;; ;; Splits content of current field down into (empty) target field
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "||ab ||\n||||" 4 12 "|| a ||\n|| b ||")
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "|| abc||def ||\n|| ||      ||\nAny Text" 9 20
-  ;;     "|| abc||  ||\n|| || def ||\nAny Text")
-  ;; ;; Prepends any content in target column
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "|| ab ||\n||xy||" 5 13 "|| ab ||\n|| bxy ||")
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "||ab ||\n|| xy    dfsdfsd ||" 3 10 "|| ||\n|| abxy    dfsdfsd ||")
-  ;; ;; Inserts a new table row
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "||      ab ||    ||\n||||||" 23 33
-  ;;     "||      ab ||    ||\n||  ||||\n||  ||  ||\n")
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "||r      ab ||    ||\nAny other text" 4 18
-  ;;     "|| r ||    ||\n|| ab ||  ||\nAny other text")
-  ;; (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
-  ;;     "||      ab || bap||\nAny other text" 17 28
-  ;;     "||      ab || ba ||\n||  || p ||\nAny other text")
-  )
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "|| ||\n|| ||" 4 11 "||  ||\n||  ||")
+  ;; Splits content of current field down into (empty) target field
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "||ab ||\n||||" 4 12 "|| a ||\n|| b ||")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "|| abc||def ||\n|| ||      ||\nAny Text" 9 20
+      "|| abc||  ||\n|| || def ||\nAny Text")
+  ;; Prepends any content in target column
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "|| ab ||\n||xy||" 5 12 "|| a ||\n|| bxy ||")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "||ab ||\n|| xy    dfsdfsd ||" 3 11 "||  ||\n|| abxy    dfsdfsd ||")
+  ;; Inserts a new table row
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "||      ab ||    ||\n||||||" 23 33
+      "||      ab ||    ||\n||  ||||\n||  ||  ||\n")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "||r      ab ||    ||\nAny other text" 4 18
+      "|| r ||    ||\n|| ab ||  ||\nAny other text")
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "||      ab || bap||\nAny other text" 17 28
+      "||      ab || ba ||\n||  || p ||\nAny other text")
+  ;; Check with active region
+  (test-moin--command-at-point-changes-buffer 'moin-command-meta-return
+      "|| abc||def ||\n|| || gef||\nAny Text" 10 22
+      "|| abc|| de ||\n|| || fgef ||\nAny Text" 1))
 
 
 (ert-deftest test-moin--meta-return-error ()
   "Tests `moin-command-meta-return' in error situations"
-  ;; ;; Malformed next row
-  ;; (test-moin--command-at-point-expects-error
-  ;;  'moin-command-meta-return "|| abc||def ||\n|| ||" 'user-error  10)
-  ;; ;; Command not allowed at bol and eol
-  ;; (test-moin--command-at-point-expects-error
-  ;;  'moin-command-meta-return "|| abc||def ||" 'user-error  1)
-  ;; (test-moin--command-at-point-expects-error
-  ;;  'moin-command-meta-return "|| abc||def ||" 'user-error  15)
-  )
+  ;; Malformed next row
+  (test-moin--command-at-point-expects-error
+   'moin-command-meta-return "|| abc||def ||\n|| ||" 'user-error  10)
+  ;; Command not allowed at bol and eol
+  (test-moin--command-at-point-expects-error
+   'moin-command-meta-return "|| abc||def ||" 'user-error  1)
+  (test-moin--command-at-point-expects-error
+   'moin-command-meta-return "|| abc||def ||" 'user-error  15))
 
 ;; ==================================================
 ;; Testing list functions

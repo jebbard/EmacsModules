@@ -72,124 +72,84 @@ realign original and target field
  if necessary, prepend content already present in the target field if necessary,
 realign original and target field."
   (let
-      (column-details
-       next-column-details
+      (initial-point
+       current-row-column-details
        current-table-column
-       current-column-info
-       current-start-point
-       current-end-point
-       current-text
-       next-column-info
-       next-start-point
-       next-end-point
-       next-text
-       text-to-prepend)
-    
-    (if (string= mode "SPLIT")
-	(progn
-	    (message "CURR end point %s" current-end-point)
-	    (message "PALIFAX point %s" (point))
-	  )
-	  )
-    
+       current-field-info
+       current-field-start-point
+       current-field-end-point
+       current-field-text
+       current-field-text-override
+       next-row-column-details
+       next-field-info
+       next-field-start-point
+       next-field-text
+       next-field-text-override)
+
+    (if (use-region-p)
+	(deactivate-mark))
+
+    (setq initial-point (point))
+
     (if (or (eolp) (bolp))
-	(if (string= mode "BASIC")
-	    (newline)
-	  (user-error "Point must be within a table field for this command"))
+  	(if (string= mode "BASIC")
+  	    (newline)
+  	  (user-error "Point must be within a table field for this command"))
       (progn
+	;; Determine details of current row and current field
+  	(setq current-row-column-details (moin--table-determine-column-details))
+  	(setq current-table-column (car current-row-column-details))
+  	(setq current-field-info (nth (- current-table-column 1) (cdr current-row-column-details)))
+	(setq current-field-start-point (car current-field-info))
+  	(setq current-field-end-point (car (cdr current-field-info)))
+  	(setq current-field-text (car (cdr (cdr current-field-info))))
 
-	(setq column-details (moin--table-determine-column-details))
-	(setq current-table-column (car column-details))
-	(setq current-column-info (nth (- current-table-column 1) (cdr column-details)))
-	(setq current-end-point (car (cdr current-column-info)))
+	;; Determine new text (if any) of current and next field
+	(setq current-field-text-override current-field-text)
+	(setq next-field-text-override next-field-text)
 	
-	(if (string= mode "SPLIT")
-	    (progn
-	    (message "CURR end point %s" current-end-point)
-	    (message "CRATACOA point %s" (point))
-	      )
-	  )
+	(cond ((string= mode "SPLIT")
+	       (setq current-field-text-override
+		     (buffer-substring-no-properties current-field-start-point initial-point))
+	       (setq next-field-text-override
+		     (string-trim (buffer-substring-no-properties initial-point current-field-end-point))))
+	      ((string= mode "COPY")
+	       (setq next-field-text-override current-field-text)))
 
-	(if (string= mode "SPLIT")
-	    (progn
-	      (setq text-to-prepend (buffer-substring-no-properties (point) current-end-point))
-	      (delete-forward-char (- (point) current-end-point))
-	      (setq column-details (moin--table-determine-column-details))
-	      (setq current-column-info (nth (- current-table-column 1) (cdr column-details)))))
-	
-        (moin--table-fix-field current-column-info)
-	
-	(setq column-details (moin--table-determine-column-details))
-	(setq current-table-column (car column-details))
-	(setq current-column-info (nth (- current-table-column 1) (cdr column-details)))
+	;; Fix current field (must be done before taking details of next field as it might move point)
+	(moin--table-fix-field current-field-info current-field-text-override)
 
-	(setq current-start-point (car current-column-info))
-	(setq current-end-point (car (cdr current-column-info)))
-	(setq current-text (car (cdr (cdr current-column-info))))
-
-	(if (string= mode "SPLIT")
-	    (message "CURR end point %s" current-end-point)
-	  )
-	
-	(end-of-line)
+        ;; Go to next table row, if there is none, create it
+  	(end-of-line)
 
         (if (eobp)
-	    (newline)
-	  (next-line))
+  	    (newline)
+  	  (next-line))
 
-	(if (not (moin-is-in-table-p))
-	    (progn
-	      (previous-line)
-	      (moin--table-insert-row nil)
-	      (move-to-column (- (* 4 current-table-column) 1))
-	      
-	      (if (string= mode "COPY")
-		  (progn
-		    (insert current-text)
-		    (setq next-column-details (moin--table-determine-column-details))
-		    (setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))
-		    (moin--table-fix-field next-column-info)
-		    (setq next-start-point (car next-column-info))
-		    (goto-char (+ next-start-point 1))
-		    )
-		  (if (string= mode "SPLIT")
-		      (progn
-			(insert text-to-prepend)
-			(setq next-column-details (moin--table-determine-column-details))
-			(setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))
-			(setq next-start-point (car next-column-info))
-			(goto-char (+ next-start-point 1))
+  	(if (not (moin-is-in-table-p))
+  	    (progn
+  	      (previous-line)
+  	      (moin--table-insert-row nil)))
 
-			))))
-	  (progn
-	    (setq next-column-details (moin--table-determine-column-details))
+	;; Determine details of next row and next field
+  	(setq next-row-column-details (moin--table-determine-column-details))
+	
+	(if (< (length next-row-column-details) (+ current-table-column 1))
+	    (user-error "Malformed table, less columns than in row before, please fix manually!"))
+	  
+	(setq next-field-info (nth (- current-table-column 1) (cdr next-row-column-details)))
+	(setq next-field-start-point (car next-field-info))
+	(setq next-field-text (car (cdr (cdr next-field-info))))
 
-	    (if (< (length next-column-details) (+ current-table-column 1))
-		(user-error "Malformed table, less columns than in row before, please fix manually!")
-	      (progn
-		(setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))
-		(setq next-start-point (car next-column-info))
-		(setq next-end-point (car (cdr next-column-info)))
-		(setq next-text (car (cdr (cdr next-column-info))))
+	;; Determine new text (if any) of next field and fix it
+	(cond ((string= mode "SPLIT")
+	       (setq next-field-text-override
+		     (concat next-field-text-override (string-trim next-field-text)))))
 
-		(if (string= mode "COPY")
-		    (progn
-		      (goto-char next-start-point)
-		      (delete-forward-char (- next-end-point next-start-point))
-		      (insert current-text)
-		      (setq next-column-details (moin--table-determine-column-details))
-		      (setq next-column-info (nth (- current-table-column 1) (cdr next-column-details))))
-		  (if (string= mode "SPLIT")
-		      (progn
-		  	(goto-char next-start-point)
-		  	(insert text-to-prepend)
-		  	(setq next-column-details (moin--table-determine-column-details))
-		  	(setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))))
-		  )
-		
-		(moin--table-fix-field next-column-info)
-		(setq next-start-point (car next-column-info))
-		(goto-char (+ next-start-point 1))))))))))
+	(moin--table-fix-field next-field-info next-field-text-override)
+
+	;; Goto final position
+	(goto-char (+ next-field-start-point 1))))))
 
 
 (defun moin--table-previous-field (&optional arg)
@@ -280,6 +240,28 @@ the end of the field text, i.e. after the padding blank."
 	(replace-match new-field-text nil t))))
 
 
+(defun moin--table-fix-field2 (field-info &optional new-field-text)
+  "Fixes the content of a field by ensuring it starts and ends with a single
+blank. Expects a field-info list with start-column of field (on current line)
+as first element, end-column of field as second and field-text as third element.
+That said, callers must ensure they are on the correct line before calling
+this function. If a new-field-text is given, the old field-text is replaced by
+the new-field-text, ensuring single blanks at start end end as described. After
+this function, point will be at the end of the field text, i.e. after the padding
+blank. This function returns the new fixed field text starting at start-column."
+  (let ((start-column (car field-info))
+    (field-text (car (cdr (cdr field-info)))))
+
+    (if (not new-field-text)
+	(setq new-field-text field-text))
+
+    (setq new-field-text (concat " " (string-trim new-field-text) " "))
+    (move-to-column start-column)
+
+    (if (re-search-forward (regexp-quote field-text) (point-at-eol) t)
+	(replace-match new-field-text nil t))))
+
+
 (defun moin--table-move-column-right (&optional arg)
   "See `moin-command-meta-right' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
@@ -328,8 +310,7 @@ Expects to actually be in a table as prerequisite. Never call this
 function if point is currently not in a table. If insert-before-p is
 t, the new row is inserted before the current row, otherwise it is
 inserted after the current row. In any case, it inserts a row with
-the same number of columns as the current row. Point will not be
-affected by this function."
+the same number of columns as the current row."
   (let
       (column-details column-count)
 
