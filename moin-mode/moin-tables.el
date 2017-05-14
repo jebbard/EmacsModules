@@ -58,24 +58,138 @@
 ;; ==================================================
 ;; "Private" Functions
 
-(defun moin--table-next-row (&optional arg)
+(defun moin--table-next-row (mode)
   "See `moin-command-table-next-row' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
-  (if (eolp)
-      (newline)
-    (progn
-      (user-error "Not implemented yet!"))))
+function if point is currently not in a table.
+The parameter mode is a string and can have the values:
+* 'BASIC': Just go to the next row, create one if necessary,
+realign original and target field
+* 'COPY': Copy down content of the current field to the next row, create one
+ if necessary, override content already present in the target field if necessary,
+realign original and target field
+* 'SPLIT': Split content of the current field to the next row, create one
+ if necessary, prepend content already present in the target field if necessary,
+realign original and target field."
+  (let
+      (column-details
+       next-column-details
+       current-table-column
+       current-column-info
+       current-start-point
+       current-end-point
+       current-text
+       next-column-info
+       next-start-point
+       next-end-point
+       next-text
+       text-to-prepend)
+    
+    (if (string= mode "SPLIT")
+	(progn
+	    (message "CURR end point %s" current-end-point)
+	    (message "PALIFAX point %s" (point))
+	  )
+	  )
+    
+    (if (or (eolp) (bolp))
+	(if (string= mode "BASIC")
+	    (newline)
+	  (user-error "Point must be within a table field for this command"))
+      (progn
 
+	(setq column-details (moin--table-determine-column-details))
+	(setq current-table-column (car column-details))
+	(setq current-column-info (nth (- current-table-column 1) (cdr column-details)))
+	(setq current-end-point (car (cdr current-column-info)))
+	
+	(if (string= mode "SPLIT")
+	    (progn
+	    (message "CURR end point %s" current-end-point)
+	    (message "CRATACOA point %s" (point))
+	      )
+	  )
 
-(defun moin--table-next-row-split-field (&optional arg)
-  "See `moin-command-meta-return' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
-  (if (eolp)
-      (newline)
-    (progn
-      (user-error "Not implemented yet!"))))
+	(if (string= mode "SPLIT")
+	    (progn
+	      (setq text-to-prepend (buffer-substring-no-properties (point) current-end-point))
+	      (delete-forward-char (- (point) current-end-point))
+	      (setq column-details (moin--table-determine-column-details))
+	      (setq current-column-info (nth (- current-table-column 1) (cdr column-details)))))
+	
+        (moin--table-fix-field current-column-info)
+	
+	(setq column-details (moin--table-determine-column-details))
+	(setq current-table-column (car column-details))
+	(setq current-column-info (nth (- current-table-column 1) (cdr column-details)))
+
+	(setq current-start-point (car current-column-info))
+	(setq current-end-point (car (cdr current-column-info)))
+	(setq current-text (car (cdr (cdr current-column-info))))
+
+	(if (string= mode "SPLIT")
+	    (message "CURR end point %s" current-end-point)
+	  )
+	
+	(end-of-line)
+
+        (if (eobp)
+	    (newline)
+	  (next-line))
+
+	(if (not (moin-is-in-table-p))
+	    (progn
+	      (previous-line)
+	      (moin--table-insert-row nil)
+	      (move-to-column (- (* 4 current-table-column) 1))
+	      
+	      (if (string= mode "COPY")
+		  (progn
+		    (insert current-text)
+		    (setq next-column-details (moin--table-determine-column-details))
+		    (setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))
+		    (moin--table-fix-field next-column-info)
+		    (setq next-start-point (car next-column-info))
+		    (goto-char (+ next-start-point 1))
+		    )
+		  (if (string= mode "SPLIT")
+		      (progn
+			(insert text-to-prepend)
+			(setq next-column-details (moin--table-determine-column-details))
+			(setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))
+			(setq next-start-point (car next-column-info))
+			(goto-char (+ next-start-point 1))
+
+			))))
+	  (progn
+	    (setq next-column-details (moin--table-determine-column-details))
+
+	    (if (< (length next-column-details) (+ current-table-column 1))
+		(user-error "Malformed table, less columns than in row before, please fix manually!")
+	      (progn
+		(setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))
+		(setq next-start-point (car next-column-info))
+		(setq next-end-point (car (cdr next-column-info)))
+		(setq next-text (car (cdr (cdr next-column-info))))
+
+		(if (string= mode "COPY")
+		    (progn
+		      (goto-char next-start-point)
+		      (delete-forward-char (- next-end-point next-start-point))
+		      (insert current-text)
+		      (setq next-column-details (moin--table-determine-column-details))
+		      (setq next-column-info (nth (- current-table-column 1) (cdr next-column-details))))
+		  (if (string= mode "SPLIT")
+		      (progn
+		  	(goto-char next-start-point)
+		  	(insert text-to-prepend)
+		  	(setq next-column-details (moin--table-determine-column-details))
+		  	(setq next-column-info (nth (- current-table-column 1) (cdr next-column-details)))))
+		  )
+		
+		(moin--table-fix-field next-column-info)
+		(setq next-start-point (car next-column-info))
+		(goto-char (+ next-start-point 1))))))))))
 
 
 (defun moin--table-previous-field (&optional arg)
@@ -97,10 +211,7 @@ function if point is currently not in a table."
        current-table-column
        current-column-info
        next-column-info
-       next-start-point
-       next-end-point
-       next-col-text
-       column-length-change)
+       next-start-point)
 
     (setq column-details (moin--table-determine-column-details))
     (setq current-table-column (car column-details))
@@ -148,24 +259,25 @@ function if point is currently not in a table."
 		  (goto-char (+ next-start-point 1))))))))))
 
 
-(defun moin--table-fix-field (column-info)
+(defun moin--table-fix-field (field-info &optional new-field-text)
   "Fixes the content of a field by ensuring it starts and ends with a single
-blank. Expects a column info list with start-point of column as first element,
-end-point of column as second and column-text as third element. Returns the 
-number of characters by which the length of the column has changed after the
-fix."
-  (let ((start-point (car column-info))
-    (end-point (car (cdr column-info)))
-    (column-text (car (cdr (cdr column-info))))
-    new-column-text)
+blank. Expects a field-info list with start-point of field as first element,
+end-point of field as second and field-text as third element. If a new-field-text
+is given, the old field-text is replaced by the new-field-text, and ensuring single 
+blanks at start end end as described. After this function, point will be at
+the end of the field text, i.e. after the padding blank."
+  (let ((start-point (car field-info))
+    (end-point (car (cdr field-info)))
+    (field-text (car (cdr (cdr field-info)))))
 
-    (setq new-column-text (concat " " (string-trim column-text) " "))
+    (if (not new-field-text)
+	(setq new-field-text field-text))
+
+    (setq new-field-text (concat " " (string-trim new-field-text) " "))
     (goto-char start-point)
 
-    (if (re-search-forward (regexp-quote column-text) (point-at-eol) t)
-	(replace-match new-column-text nil nil))
-
-    (- (length new-column-text) (length column-text))))
+    (if (re-search-forward (regexp-quote field-text) (point-at-eol) t)
+	(replace-match new-field-text nil t))))
 
 
 (defun moin--table-move-column-right (&optional arg)
@@ -320,7 +432,7 @@ malformed, it throws a user-error."
 		       "Invalid table size format specified, should be Columns x Rows [e.g. "
 		       moin-const-table-default-size "]"))
        (table-size-list (split-string table-size-string "x" t nil))
-       cols, rows, point-before-table)
+       cols rows point-before-table)
 
     (if (not (eq (length table-size-list) 2))
 	(user-error error-message))

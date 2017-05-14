@@ -150,6 +150,7 @@
   (define-key moin-mode-map (kbd "M-<return>") 'moin-command-meta-return)
   (define-key moin-mode-map (kbd "C-<return>") 'moin-command-insert-heading-respect-content)
   (define-key moin-mode-map (kbd "<return>") 'moin-command-table-next-row)
+  (define-key moin-mode-map (kbd "S-<return>") 'moin-command-table-copy-down)
   
   ;; Moving in tables or Outline cycle (a.k.a. visibility cycling)
   (define-key moin-mode-map [tab] 'moin-command-tab)
@@ -191,7 +192,7 @@ span multiple lines. It does not check if it is already in a formatted area."
   (interactive "p")
   (let
       ((prefix-suffix-len (length formatting-prefix-and-suffix))
-       start-point, end-point)
+       start-point end-point)
 
     (if (region-active-p)
 	(progn
@@ -391,8 +392,14 @@ context:
 * If point is currently in a table, it moves to the next row, splitting 
 the content of the current field in two parts starting at point, if point
 is currently in the middle of the field. It creates a new row if point is
-currently in the last row. In contrast to org mode, selection or prefix
-arguments are not considered, there is no specific functionality for this.
+currently in the last row. If the next row already contains text in the
+field below, this text is prepended by the text split from the row's field
+field. If there is no next row, this command creates a new row. For the
+current as well as the target field, it ensures that there is just one
+blank after the previous and before the next column separator after moving
+to the next field. On the end or start of a line, this command throws an error.
+In contrast to org mode, selection or prefix arguments are not considered,
+there is no specific functionality for this.
 * If point is currently in a list, it inserts a new item with the same
 level as the one at point. If the comamnd is used in the middle of a list item,
 it is split and the text after point is taken as text of the new item. 
@@ -411,7 +418,7 @@ point, at the same level of the first heading before point. An error message
 is given if there is no heading before point."
   (interactive "p")
   (if (moin-is-in-table-p)
-      (moin--table-next-row-split-field arg)
+      (moin--table-next-row "SPLIT")
     (if (moin-is-in-list-p)
 	(moin--list-insert-item-same-level arg)
       ;; else insert a new headline
@@ -433,11 +440,30 @@ it goes to the end of buffer and inserts a new heading line of level 1."
 
 
 (defun moin-command-table-next-row (&optional arg)
-  "When in a table, moves to the next row. On the end of a line, it 
-still does NEWLINE and thus can be used to split a table."
+  "When in a table, moves to the next row. If there is no next row, this
+command creates a new row. For both the current as well as the
+field below this command moves to, it ensures that there is just one blank
+after the previous and before the next column separator after moving to the
+next field. On the end or start of a line, it still does NEWLINE and thus
+can be used to split a table. The same is true if the command is used outside
+of a table. This ensures that the default keybinding to RET works as expected."
   (interactive "p")
   (if (moin-is-in-table-p)
-      (moin--table-next-row arg)
+      (moin--table-next-row "BASIC")
+    ;; else: Not in table, simply newline
+    (newline)))
+
+
+(defun moin-command-table-copy-down (&optional arg)
+  "When in a table, moves to the next row and copies the content of the current
+field down. If the next row already contains text in the field below, this text
+is replaced by the copied text. If there is no next row, this command creates a
+new row. For the current field, it ensures that there is just one blank after
+the previous and before the next column separator after moving to the next field.
+On the end or start of a line, this command throws an error."
+  (interactive "p")
+  (if (moin-is-in-table-p)
+      (moin--table-next-row "COPY")
     ;; else: Not in table, simply newline
     (newline)))
 
