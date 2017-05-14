@@ -99,7 +99,7 @@ realign original and target field."
 	;; Determine details of current row and current field
   	(setq current-row-column-details (moin--table-determine-column-details))
   	(setq current-table-column (car current-row-column-details))
-  	(setq current-field-info (nth (- current-table-column 1) (cdr current-row-column-details)))
+  	(setq current-field-info (nth current-table-column current-row-column-details))
 	(setq current-field-start-point (car current-field-info))
   	(setq current-field-end-point (car (cdr current-field-info)))
   	(setq current-field-text (car (cdr (cdr current-field-info))))
@@ -137,11 +137,12 @@ realign original and target field."
 	(if (< (length next-row-column-details) (+ current-table-column 1))
 	    (user-error "Malformed table, less columns than in row before, please fix manually!"))
 	  
-	(setq next-field-info (nth (- current-table-column 1) (cdr next-row-column-details)))
+	(setq next-field-info (nth current-table-column next-row-column-details))
 	(setq next-field-start-point (car next-field-info))
 	(setq next-field-text (car (cdr (cdr next-field-info))))
 
-	;; Determine new text (if any) of next field and fix it
+	;; Specifically for SPLIT: After having determined the text of the next field previously,
+	;; we have to prepend it with the text split from current field
 	(cond ((string= mode "SPLIT")
 	       (setq next-field-text-override
 		     (concat next-field-text-override (string-trim next-field-text)))))
@@ -156,9 +157,57 @@ realign original and target field."
   "See `moin-command-table-previous-field' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  ;; It seems impossible to redirect to the mysterious key "S-tab" or also
-  ;; called "<backtab>" or "BACKTAB", so we assume nobody needs this...
-  (user-error "Not implemented yet!"))
+    (let
+      (column-details
+       previous-column-details
+       current-table-column
+       current-column-info
+       previous-column-info
+       previous-start-point
+       current-column
+       end-delimiter-start-column)
+
+    (setq column-details (moin--table-determine-column-details))
+    (setq current-table-column (car column-details))
+    (setq current-column-info (nth current-table-column column-details))
+    (setq current-column (current-column))
+    (setq end-delimiter-start-column (- (point-at-eol) (point-at-bol) 2))
+
+    (moin--table-fix-field current-column-info)
+
+    ;; If we are behind the last field, we have to move there
+    (if (> current-column end-delimiter-start-column)
+	(setq previous-column-info current-column-info)
+      ;; If we are in fields 2 to N, we have to move to the previous
+      ;; column in the current row
+      (progn
+	(if (> current-table-column 1)
+	    (progn
+	      ;; No update of column details necessary here, as we just fixed the next field
+	      (setq previous-column-details column-details)
+	      (setq previous-column-info (nth (- current-table-column 1) previous-column-details)))
+	  ;; If we are in field 1, we have to move to the last
+	  ;; column in the previous row, if any
+	  (if (eq current-table-column 1)
+	      (progn
+		(beginning-of-line)
+		
+		(if (bobp)
+		    (user-error "No previous field in this table")
+		  (previous-line))
+
+		(if (not (moin-is-in-table-p))
+ 		    (user-error "No previous field in this table"))
+
+		(setq previous-column-details (moin--table-determine-column-details))
+		(setq previous-column-info (nth
+					    (- (length previous-column-details) 1) previous-column-details)))))
+
+	(moin--table-fix-field previous-column-info)))
+    
+    (setq previous-start-point (car previous-column-info))
+
+    (goto-char (+ previous-start-point 1))))
 
 
 (defun moin--table-next-field (&optional arg)
@@ -171,52 +220,50 @@ function if point is currently not in a table."
        current-table-column
        current-column-info
        next-column-info
-       next-start-point)
+       next-start-point
+       current-column)
 
     (setq column-details (moin--table-determine-column-details))
     (setq current-table-column (car column-details))
-    (setq current-column-info (nth (- current-table-column 1) (cdr column-details)))
-    
+    (setq current-column-info (nth current-table-column column-details))
+    (setq current-column (current-column))
+
+    (moin--table-fix-field current-column-info)
+
     ;; If we are before the first field, we have to move there
-    (if (< (current-column) 2)
-	(progn
-	  (moin--table-fix-field current-column-info)
-	  (setq next-column-info current-column-info)
-	  (setq next-start-point (car next-column-info))
-	  (goto-char (+ next-start-point 1)))
+    (if (< current-column 2)
+	(setq next-column-info current-column-info)
       ;; If we are in fields 1 to N-1, we have to move to the next
       ;; column in the current row
-      (if (< current-table-column (length (cdr column-details)))
-	  (progn
-	    (moin--table-fix-field current-column-info)
-	    ;; Update column details, as the fix might have moved the next column
-            (setq next-column-details (moin--table-determine-column-details))
-	    (setq next-column-info (nth current-table-column (cdr next-column-details)))
-	    (moin--table-fix-field next-column-info)
-	    (setq next-start-point (car next-column-info))
-	    (goto-char (+ next-start-point 1)))
-        ;; If we are in field N, we have to move to the first
-        ;; column in the next row, if any
-	(if (eq current-table-column (length (cdr column-details)))
+      (progn
+	(if (< current-table-column (length (cdr column-details)))
 	    (progn
-              (moin--table-fix-field current-column-info)
-	      (end-of-line)
-	      
-	      (if (eobp)
-		  (newline)
-		(next-line))
+	      ;; Update column details, as the fix might have moved the next column
+	      (setq next-column-details (moin--table-determine-column-details))
+	      (setq next-column-info (nth (+ current-table-column 1) next-column-details)))
+	  ;; If we are in field N, we have to move to the first
+	  ;; column in the next row, if any
+	  (if (eq current-table-column (length (cdr column-details)))
+	      (progn
+		(end-of-line)
+		
+		(if (eobp)
+		    (newline)
+		  (next-line))
 
-	      (if (not (moin-is-in-table-p))
-		  (progn
-		    (previous-line)
-		    (moin--table-insert-row nil)
-		    (move-to-column 3))
-		(progn
-		  (setq next-column-details (moin--table-determine-column-details))
-		  (setq next-column-info (car (cdr next-column-details)))
-		  (moin--table-fix-field next-column-info)
-		  (setq next-start-point (car next-column-info))
-		  (goto-char (+ next-start-point 1))))))))))
+		(if (not (moin-is-in-table-p))
+		    (progn
+		      (previous-line)
+		      (moin--table-insert-row nil)))
+
+		(setq next-column-details (moin--table-determine-column-details))
+		(setq next-column-info (car (cdr next-column-details))))))
+
+	(moin--table-fix-field next-column-info)))
+    
+    (setq next-start-point (car next-column-info))
+
+    (goto-char (+ next-start-point 1))))
 
 
 (defun moin--table-fix-field (field-info &optional new-field-text)
@@ -235,28 +282,6 @@ the end of the field text, i.e. after the padding blank."
 
     (setq new-field-text (concat " " (string-trim new-field-text) " "))
     (goto-char start-point)
-
-    (if (re-search-forward (regexp-quote field-text) (point-at-eol) t)
-	(replace-match new-field-text nil t))))
-
-
-(defun moin--table-fix-field2 (field-info &optional new-field-text)
-  "Fixes the content of a field by ensuring it starts and ends with a single
-blank. Expects a field-info list with start-column of field (on current line)
-as first element, end-column of field as second and field-text as third element.
-That said, callers must ensure they are on the correct line before calling
-this function. If a new-field-text is given, the old field-text is replaced by
-the new-field-text, ensuring single blanks at start end end as described. After
-this function, point will be at the end of the field text, i.e. after the padding
-blank. This function returns the new fixed field text starting at start-column."
-  (let ((start-column (car field-info))
-    (field-text (car (cdr (cdr field-info)))))
-
-    (if (not new-field-text)
-	(setq new-field-text field-text))
-
-    (setq new-field-text (concat " " (string-trim new-field-text) " "))
-    (move-to-column start-column)
 
     (if (re-search-forward (regexp-quote field-text) (point-at-eol) t)
 	(replace-match new-field-text nil t))))

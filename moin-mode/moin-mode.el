@@ -103,6 +103,9 @@
 ;; v0.6    2017-05-04  Jens Ebert            <jensebert@gmx.net>
 ;; - Various automated tests and bugfixes for headings, tables, lists
 ;; - Table creation
+;; v0.7    2017-05-14  Jens Ebert            <jensebert@gmx.net>
+;; - Various table next row commands
+;; - Table next field and table previous field
 
 ;;; Code:
 ;; ==================================================
@@ -471,13 +474,17 @@ On the end or start of a line, this command throws an error."
 (defun moin-command-table-previous-field (&optional arg)
   "When in a table, moves to the previous field, if any. The previous field is
  the field to the left of the current one, or in case that the current field 
-is in the left-most column, the last field of the previous row."
+is in the left-most column, the last field of the previous row. In contrast
+to `moin-command-tab' in tables, it will not prepend a new row in case point is
+currently in the very first field of the table. If the previous field
+already constains text, this command positions point just before the first 
+non-whitespace character of the field. After moving to the previous field - 
+for both the current as well as the previous field - this command ensures that
+there is just one blank after the previous and before the next column separator."
   (interactive "p")
   (if (moin-is-in-table-p)
-      (moin--table-previous-field arg))
-  ;; TODO: Redirect to global binding here?
-  ;;(call-interactively (global-key-binding "S-\t"))
-  )
+      (moin--table-previous-field arg)
+    (user-error "This command can only be used in tables")))
 
 
 (defun moin-command-create-bullet-list (&optional arg)
@@ -521,9 +528,9 @@ is in the last column of the table. If the current field is the last field
 of the table in the right-most column, this command will create a new empty
 row and put point into the left-most field of the new row. If the next field
 already constains text, this command positions point just before the first 
-non-whitespace character of the field. For both the current as well as the
-next field, this command ensures that there is just one blank after the previous
-and before the next column separator after moving to the next field.
+non-whitespace character of the field. After moving to the next field - 
+for both the current as well as the next field - this command ensures that
+there is just one blank after the previous and before the next column separator.
 * If point is currently on a heading, it performs visibility cycling. It 
 cycles the current heading level between three states:
  * FOLDED: Hides the entire subtree and content of the current heading
