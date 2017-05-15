@@ -740,6 +740,39 @@ Expectations are given in the list form (current-column (start-point end-point c
 	(should (equal (+ (length text) 5) (point)))))))
 
 
+(ert-deftest test-moin--table-remove-row ()
+  "Tests `moin-command-meta-shift-up' for tables"
+  ;; Remove first row
+  (check-func-at-point 'moin-command-meta-shift-up
+      "|| ab ||\n|| xy ||" 5 5 "|| xy ||")
+  ;; Remove sole row (no other content)
+  (check-func-at-point 'moin-command-meta-shift-up
+      "|| xy ||" 5 1 "")
+  ;; Remove sole row (other content)
+  (check-func-at-point 'moin-command-meta-shift-up
+      "Ciao\n|| xy ||\nHallo" 14 11 "Ciao\nHallo")
+  ;; Remove middle row, next row has at least (column-count) characters
+  (check-func-at-point 'moin-command-meta-shift-up
+      "|| ab || cde   || fg ||\n|||| hhhh   || ö ||\n||xyz|| test ||      ||\nAny text behind"
+      38 38
+      "|| ab || cde   || fg ||\n||xyz|| test ||      ||\nAny text behind")
+  ;; Remove middle row, next row has less than (column-count) characters
+  (check-func-at-point 'moin-command-meta-shift-up
+      "|| ab || cde   || fg ||\n|||| hhhh   || ö ||\n||||||a||\nAny text behind"
+      38 34
+      "|| ab || cde   || fg ||\n||||||a||\nAny text behind")
+  ;; Remove last row, previous row has at least (column-count) characters
+  (check-func-at-point 'moin-command-meta-shift-up
+      "|| ab || cde   || fg ||\n|||| hhhh   || ö ||\n||xyz|| test ||      ||\nAny text behind"
+      52 32
+      "|| ab || cde   || fg ||\n|||| hhhh   || ö ||\nAny text behind")
+  ;; Remove last row, previous row has less than (column-count) characters
+  (check-func-at-point 'moin-command-meta-shift-up
+      "|| a || c || f ||\n|||| || ö ||\n||xyz|| test ||      ||\nAny text behind"
+      54 31
+      "|| a || c || f ||\n|||| || ö ||\nAny text behind"))
+
+
 (ert-deftest test-moin--table-next-row ()
   "Tests `moin-command-table-next-row'"
   ;; Moves to the next field and fixes previous and target field
@@ -869,6 +902,43 @@ Expectations are given in the list form (current-column (start-point end-point c
    'moin-command-meta-return "|| abc||def ||" 1 'user-error)
   (check-func-at-point-throws-error
    'moin-command-meta-return "|| abc||def ||" 15 'user-error))
+
+
+(ert-deftest test-moin-move-row-up ()
+  "Tests `moin-command-meta-up' for tables"
+  
+  (check-func-at-point 'moin-command-meta-up
+      "|| ab ||\n||||" 10 1 "||||\n|| ab ||\n")
+  (check-func-at-point 'moin-command-meta-up
+      "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 35 11
+      "|| ||      ||||\n|| abc||def || xyz   ||\n||tr|| rg || xy ||\nAny Text"))
+
+
+(ert-deftest test-moin-move-row-up-error ()
+  "Tests `moin-command-meta-up' for tables in error case"
+  (check-func-at-point-throws-error
+   'moin-command-meta-up "|| abc||def ||\n|| || ||" 10 'user-error)
+  (check-func-at-point-throws-error
+   'moin-command-meta-up "Any other text\n|| abc||def ||\nAny other text" 17 'user-error))
+
+
+(ert-deftest test-moin-move-row-down ()
+  "Tests `moin-command-meta-down' for tables"
+  
+  (check-func-at-point 'moin-command-meta-down
+      "||||\n|| ab ||" 1 10 "|| ab ||\n||||\n")
+  (check-func-at-point 'moin-command-meta-down
+      "|| ||      ||||\n|| abc||def || xyz   ||\n||tr|| rg || xy ||\nAny Text" 11 35
+      "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text"))
+
+
+(ert-deftest test-moin-move-row-down-error ()
+  "Tests `moin-command-meta-down' for tables in error case"
+  (check-func-at-point-throws-error
+   'moin-command-meta-down "|| abc||def ||\n|| || ||" 20 'user-error)
+  (check-func-at-point-throws-error
+   'moin-command-meta-down "Any other text\n|| abc||def ||\nAny other text" 17 'user-error))
+
 
 ;; ==================================================
 ;; Testing list functions

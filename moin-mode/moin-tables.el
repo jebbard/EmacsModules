@@ -319,14 +319,55 @@ function if point is currently not in a table."
   "See `moin-command-meta-down' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (let ((error-text "Cannot move row further")
+    	current-column)
+
+    (save-excursion
+      ;; Check if there is a row below or this is the last row
+      (end-of-line)
+      (if (eobp)
+    	  (user-error error-text))
+
+      (next-line)
+
+      (if (not (moin-is-in-table-p))
+    	  (user-error error-text)))
+    
+    (setq current-column (current-column))
+
+    (next-line)
+    (transpose-lines 1)
+
+    (previous-line)
+
+    (move-to-column current-column)))
 
 
 (defun moin--table-move-row-up (&optional arg)
   "See `moin-command-meta-up' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (let ((error-text "Cannot move row further")
+    	current-column)
+
+    (save-excursion
+      ;; Check if there is a row above or this is the first row
+      (beginning-of-line)
+      (if (bobp)
+    	  (user-error error-text))
+
+      (previous-line)
+
+      (if (not (moin-is-in-table-p))
+    	  (user-error error-text)))
+    
+    (setq current-column (current-column))
+
+    (transpose-lines 1)
+
+    (previous-line 2)
+
+    (move-to-column current-column)))
 
 
 (defun moin--table-insert-row (insert-before-p)
@@ -364,7 +405,35 @@ the same number of columns as the current row."
   "See `moin-command-meta-shift-up' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (let (current-column
+	chars-to-delete
+	del-start-point
+	del-end-point)
+
+    (setq current-column (current-column))
+
+    (end-of-line)
+    (setq del-start-point (point-at-bol))
+    
+    (if (eobp)
+	(setq del-end-point (point-at-eol))
+      (progn
+	(next-line)
+	(beginning-of-line)
+	(setq del-end-point (point-at-bol))))
+
+    (goto-char del-start-point)
+    (delete-forward-char (- del-end-point del-start-point))
+
+    (if (and (not (moin-is-in-table-p)) (not (bobp)))
+	(progn
+	  (previous-line)
+	  (if (not (moin-is-in-table-p))
+	      (next-line))))
+
+    (if (>= (- (point-at-eol) (point-at-bol)) current-column)
+	(move-to-column current-column)
+      (move-to-column (- (point-at-eol) (point-at-bol))))))
 
 
 (defun moin--table-determine-column-details ()
