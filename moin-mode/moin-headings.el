@@ -38,10 +38,9 @@
 
 (defun moin-is-on-heading-p ()
   "Is point on a header line?"
-  (if (outline-on-heading-p)
-      (save-excursion
-	(beginning-of-line)
-	(looking-at "=\\{1,5\\} "))))
+  (save-excursion
+    (beginning-of-line)
+    (looking-at "=\\{1,5\\} ")))
 
 
 ;; ==================================================
@@ -189,7 +188,9 @@ bugfix code if emacs major version is < 25."
   "Executes a given action on the whole subtree of the current heading, including the current
 heading itself. The function sets point to the start of each of the headings belonging to the
 subtree of the current heading. Must be called only if point is currently on a heading."
-  (let (current-heading-level next-heading-level)
+  (let (current-heading-level
+	next-heading-level
+	current-point)
     
     (if (not (moin-is-on-heading-p))
 	(user-error "Only working on a heading"))
@@ -207,18 +208,24 @@ subtree of the current heading. Must be called only if point is currently on a h
       (funcall action current-heading-level)
 
       ;; Set point to next heading (no matter if visible or not)
+      (end-of-line)
+      (setq current-point (point))
       (outline-next-heading)
       
-      (if (moin-is-on-heading-p)
-	  (progn 
-	    (setq next-heading-level (moin--heading-determine-level)))
-	;; else
-	(setq next-heading-level 0))
-
-      ;; Real child found
-      (if (> next-heading-level initial-level)
+      ;; In a special case (heading at end of buffer) we could be still on the same heading,
+      ;; we exclude this point here
+      (if (not (eq current-point (point)))
 	  (progn
-	    (moin--heading-execute-action-on-subtree action initial-level next-heading-level))))))
+	    (if (moin-is-on-heading-p)
+		(progn 
+		  (setq next-heading-level (moin--heading-determine-level)))
+	      ;; else
+	      (setq next-heading-level 0))
+
+	    ;; Real child found
+	    (if (> next-heading-level initial-level)
+		(progn
+		  (moin--heading-execute-action-on-subtree action initial-level next-heading-level))))))))
 
 
 (defun moin--heading-do-demote(current-level)
@@ -258,12 +265,14 @@ to take care of also demoting or promoting the rest of the heading."
       
       (if including-subtree
 	  (moin--heading-execute-action-on-subtree change-func)
-	(funcall change-func current-heading-level))
+	(funcall change-func current-heading-level)))
 
       ;; Ensure point is at the right position after the command
-      (if (<= current-column current-heading-level)
-	  (beginning-of-line)
-	(move-to-column (+ current-column column-change))))))
+      (if (> current-column (- (point-at-eol) (point-at-bol)))
+	  (end-of-line)
+	(if (>= (+ current-column column-change) 0)
+	    (move-to-column (+ current-column column-change))
+	  (beginning-of-line)))))
 
 
 (defun moin--heading-outline-cycle (&optional arg)

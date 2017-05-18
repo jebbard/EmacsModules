@@ -349,9 +349,8 @@ can only be increased if it is not the first item below its parent."
 context:
 * If point is currently on a heading, it demotes the current heading, leaving
 its children unchanged, but only if the current heading is not already on level 1. 
-This command does not work with an active mark is active,
-which will lead to an error message. It also fixes errors in the end marker 
-of the heading, if necessary.
+This command does not work with an active mark, which will lead to an error
+message. It also fixes errors in the end marker of the heading, if necessary.
 * If point is currently in a table, it moves the current column of the
 table to the left, but only if it is not already the left-most column.
 * If point is currently in a list, it decreases the indentation, leaving its
@@ -372,9 +371,8 @@ item has children, its indentation can only be decreased by one."
 context:
 * If point is currently on a heading, it promotes the current heading, leaving
 its children unchanged, but only if the current heading is not already on level 5. 
-This command does not work with an active mark is active,
-which will lead to an error message. It also fixes errors in the end marker 
-of the heading, if necessary.
+This command does not work with an active mark, which will lead to an error
+message. It also fixes errors in the end marker of the heading, if necessary.
 * If point is currently in a table, it moves the current column of the
 table to the right, but only if it is not already the right-most column.
 * If point is currently in a list, it increases the indentation, leaving its

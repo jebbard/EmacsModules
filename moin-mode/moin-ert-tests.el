@@ -63,12 +63,12 @@ the new point at the given expected-point."
 	  (forward-char region-size)))
     
     (funcall func args)
-    
-    (should (equal expected-point (point)))
 
     (if expected-buffer-text
 	(should (equal expected-buffer-text (buffer-string)))
-      (should (equal initial-text (buffer-string))))))
+      (should (equal initial-text (buffer-string))))
+    
+    (should (equal expected-point (point)))))
 
 
 (defun check-func-at-point-throws-error(func initial-text initial-point expected-error-type
@@ -189,7 +189,8 @@ end of the heading line is malformed."
   (test-moin--execute-on-heading 'moin-is-on-heading-p "== Heading 2 " t)
   (test-moin--execute-on-heading 'moin-is-on-heading-p "=== Heading 3" t)
   (test-moin--execute-on-heading 'moin-is-on-heading-p "==== Heading 4 =====" t)
-  (test-moin--execute-on-heading 'moin-is-on-heading-p "===== Heading 5 =====" t))
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "===== Heading 5 =====" t)
+  (test-moin--execute-on-heading 'moin-is-on-heading-p "===== Hallo =====" t))
 
 
 (ert-deftest test-moin-is-on-heading-p-when-not-on-heading-line ()
@@ -403,104 +404,156 @@ without a heading before."
    "First text\n==  ==\n== Heading 2 ==\n\nAny subtree text\n=== Heading 3.1 ===\nany text\n=== Heading 3.2 ==="))
 
 
-(ert-deftest test-moin-change-level-without-subtree()
-  "Checks `moin-command-meta-left' and `moin-command-meta-right'
-connection with each other."
-  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
-						 "" "Heading 1" "" "" 1 5)
-  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
-						 "" "Heading 1" "" "" 1 1)
-  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
-						 "Anytext before\n" "Heading 2" "\nAny text behind" "" 2 19)
-  (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
-	 "Anytext before\n" "Heading 3" "\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n" "=== H3 ===\n" 3 19))
+(ert-deftest test-moin--demote-heading-wo-subtree()
+  "Checks `moin-command-meta-right' for headings."
+  (check-func-at-point 'moin-command-meta-right "= Heading 1 =" 1 2 "== Heading 1 ==")
+  (check-func-at-point 'moin-command-meta-right "=  =" 3 4 "==  ==")
+  (check-func-at-point 'moin-command-meta-right "Anytext before\n== Heading 2 ==\nAny text behind"
+		       23 24 "Anytext before\n=== Heading 2 ===\nAny text behind")
+  (check-func-at-point 'moin-command-meta-right "==== H ====" 12 13 "===== H =====")
+  (check-func-at-point 'moin-command-meta-right
+      "Anytext before\n=== Heading 3 ===\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n"
+      18 19
+      "Anytext before\n==== Heading 3 ====\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n")
+  (check-func-at-point 'moin-command-meta-right "==== Hallo ====" 8 9 "===== Hallo =====")
+  (check-func-at-point 'moin-command-meta-right "==== Heading 1 ====" 10 11 "===== Heading 1 ====="))
 
 
-(ert-deftest test-moin-change-level-with-subtree()
-  "Checks `moin-command-meta-shift-left' and `moin-command-meta-shift-right'
-connection with each other."
-  (test-moin--check-change-level 'moin-command-meta-shift-left 'moin-command-meta-shift-right
-						 "" "Heading 1" "" "" 1 5)
-  ;; (test-moin--check-change-level 'moin-command-meta-shift-left 'moin-command-meta-shift-right
-  ;; 						 "" "Heading 1" "" "" 1 1)
-  ;; (test-moin--check-change-level 'moin-command-meta-shift-left 'moin-command-meta-shift-right
-  ;; 						 "Anytext before\n" "Heading 2" "\nAny text behind" "" 2 19)
-  ;; (test-moin--check-change-level 'moin-command-meta-left 'moin-command-meta-right
-  ;; 	 "Anytext before\n" "Heading 3" "\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n" "=== H3 ===\n" 3 19))
+(ert-deftest test-moin--demote-heading-wo-subtree-error()
+  "Checks `moin-command-meta-right' for headings in error situations."
+  ;; Cannot demote further
+  (check-func-at-point-throws-error 'moin-command-meta-right
+   				    "===== Hallo =====" 8 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+   				    "===== =====" 1 'user-error)
+  ;; Not supported for active mark
+  (check-func-at-point-throws-error 'moin-command-meta-right
+   				    "=== Hallo ===" 6 'user-error 3))
+
+
+(ert-deftest test-moin--promote-heading-wo-subtree()
+  "Checks `moin-command-meta-left' for headings."
+  (check-func-at-point 'moin-command-meta-left "== Heading 2 ==" 1 1 "= Heading 2 =")
+  (check-func-at-point 'moin-command-meta-left "===  ===" 3 2 "==  ==")
+  (check-func-at-point 'moin-command-meta-left "Anytext before\n== Heading 2 ==\nAny text behind"
+  		       23 22 "Anytext before\n= Heading 2 =\nAny text behind")
+  (check-func-at-point 'moin-command-meta-left "=== H ===" 10 8 "== H ==")
+  (check-func-at-point 'moin-command-meta-left
+      "Anytext before\n=== Heading 3 ===\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n"
+      18 17
+      "Anytext before\n== Heading 3 ==\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n")
+  (check-func-at-point 'moin-command-meta-left "==== Hallo ====" 8 7 "=== Hallo ===")
+  (check-func-at-point 'moin-command-meta-left "==== Heading 1 ====" 10 9 "=== Heading 1 ==="))
+
+
+(ert-deftest test-moin--promote-heading-wo-subtree-error()
+  "Checks `moin-command-meta-left' for headings in error situations."
+  ;; Cannot demote further
+  (check-func-at-point-throws-error 'moin-command-meta-left
+   				    "= Hallo =" 8 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-left
+   				    "= =" 1 'user-error)
+  ;; Not supported for active mark
+  (check-func-at-point-throws-error 'moin-command-meta-left
+   				    "=== Hallo ===" 6 'user-error 3))
+
+
+(ert-deftest test-moin--demote-heading-with-subtree()
+  "Checks `moin-command-meta-shift-right' for headings."
+  ;; Headings without sub-headings
+  (check-func-at-point 'moin-command-meta-shift-right "= Heading 1 =" 1 2 "== Heading 1 ==")
+  (check-func-at-point 'moin-command-meta-shift-right "= Heading 1 =\n" 1 2 "== Heading 1 ==\n")
+  (check-func-at-point 'moin-command-meta-shift-right "=  =" 3 4 "==  ==")
+  (check-func-at-point 'moin-command-meta-shift-right "==== Hallo ====" 8 9 "===== Hallo =====")
+  (check-func-at-point 'moin-command-meta-shift-right "==== Heading 1 ====" 10 11 "===== Heading 1 =====")
+  (check-func-at-point 'moin-command-meta-shift-right "Anytext before\n== Heading 2 ==\nAny text behind"
+  		       23 24 "Anytext before\n=== Heading 2 ===\nAny text behind")
+  (check-func-at-point 'moin-command-meta-shift-right "==== H ====" 12 13 "===== H =====")
+  ;; With multiple, single-level sub-headings
+  (check-func-at-point 'moin-command-meta-shift-right
+      "Anytext before\n=== Heading 3 ===\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n"
+      18 19
+      "Anytext before\n==== Heading 3 ====\nAny text behind\n===== H4.1 =====\nsubtext\n===== H4.2 =====\n")
+  ;; With multiple, multi-level sub-headings
+  (check-func-at-point 'moin-command-meta-shift-right
+      "Anytext before\n= Heading 1 =\nAny text behind\n== H2.1 ==\nsubtext\n\n=== H3.1 ===\nsubtext\n=== H3.2 ===\nAny \nsub \ntext\n== H2.2 ==\nHallo"
+      29 30
+      "Anytext before\n== Heading 1 ==\nAny text behind\n=== H2.1 ===\nsubtext\n\n==== H3.1 ====\nsubtext\n==== H3.2 ====\nAny \nsub \ntext\n=== H2.2 ===\nHallo")
+    ;; With multiple, multi-level sub-headings, and sibling headings
+  (check-func-at-point 'moin-command-meta-shift-right
+      "Anytext before\n= Heading 1 =\nAny text behind\n== H2.1 ==\nsubtext\n\n=== H3.1 ===\nsubtext\n=== H3.2 ===\nAny \nsub \ntext\n== H2.2 ==\nHallo\n= Sibling Heading 1 =\nAny text behind\n== SH2.1 ==\nsubtext\n= Sibling Heading 2 =\n"
+      29 30
+      "Anytext before\n== Heading 1 ==\nAny text behind\n=== H2.1 ===\nsubtext\n\n==== H3.1 ====\nsubtext\n==== H3.2 ====\nAny \nsub \ntext\n=== H2.2 ===\nHallo\n= Sibling Heading 1 =\nAny text behind\n== SH2.1 ==\nsubtext\n= Sibling Heading 2 =\n")
+    (check-func-at-point 'moin-command-meta-shift-right
+      "Anytext before\n= Heading 1 =\nAny text behind\n== H2.1 ==\nsubtext\n\n=== H3.1 ===\nsubtext\n=== H3.2 ===\nAny \nsub \ntext\n== H2.2 ==\nHallo\n= Sibling Heading 1 =\nAny text behind\n== SH2.1 ==\nsubtext\n= Sibling Heading 2 =\n"
+      136 137
+      "Anytext before\n= Heading 1 =\nAny text behind\n== H2.1 ==\nsubtext\n\n=== H3.1 ===\nsubtext\n=== H3.2 ===\nAny \nsub \ntext\n== H2.2 ==\nHallo\n== Sibling Heading 1 ==\nAny text behind\n=== SH2.1 ===\nsubtext\n= Sibling Heading 2 =\n"))
+
+
+(ert-deftest test-moin--demote-heading-with-subtree-error()
+  "Checks `moin-command-meta-shift-right' for headings in error situations."
+  ;; Cannot demote further
+  (check-func-at-point-throws-error 'moin-command-meta-shift-right
+   				    "===== Hallo =====" 8 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-shift-right
+   				    "===== =====" 1 'user-error)
+  ;; Not supported for active mark
+  (check-func-at-point-throws-error 'moin-command-meta-shift-right
+   				    "=== Hallo ===" 6 'user-error 3)
+  ;; Cannot demote further due to child
+  ;; TODO check why outline-mode asks for next heading - interactively it works...
+  ;; (check-func-at-point-throws-error 'moin-command-meta-shift-right
+  ;; 				    "Anytext before\n=== Heading 1 ===\nAny text behind\n==== H2.1 ====\nsubtext\n\n===== H3.1 =====\nsubtext\n===== H3.2 =====\nAny \nsub \ntext\n==== H2.2 ====\nHallo" 19 'user-error)
   )
 
 
-(defun test-moin--make-heading (heading-text level)
-  "Creates and returns a new heading with the given text
-on the given level"
-  (setq heading-pre-suf (make-string level ?=))
-  (concat heading-pre-suf " " heading-text " " heading-pre-suf))
+(ert-deftest test-moin--promote-heading-with-subtree()
+  "Checks `moin-command-meta-shift-left' for headings."
+  ;; Headings without sub-headings
+  (check-func-at-point 'moin-command-meta-shift-left "== Heading 2 ==" 1 1 "= Heading 2 =")
+  (check-func-at-point 'moin-command-meta-shift-left "===  ===" 3 2 "==  ==")
+  (check-func-at-point 'moin-command-meta-shift-left "==== Hallo ====" 8 7 "=== Hallo ===")
+  (check-func-at-point 'moin-command-meta-shift-left "==== Heading 1 ====" 10 9 "=== Heading 1 ===")
+  (check-func-at-point 'moin-command-meta-shift-left "Anytext before\n== Heading 2 ==\nAny text behind"
+  		       23 22 "Anytext before\n= Heading 2 =\nAny text behind")
+  (check-func-at-point 'moin-command-meta-shift-left "=== H ===" 10 8 "== H ==")
+  ;; With multiple, single-level sub-headings
+  (check-func-at-point 'moin-command-meta-shift-left
+	     "Anytext before\n=== Heading 3 ===\nAny text behind\n==== H4.1 ====\nsubtext\n==== H4.2 ====\n"
+		       18 17
+	     "Anytext before\n== Heading 3 ==\nAny text behind\n=== H4.1 ===\nsubtext\n=== H4.2 ===\n")
+  ;; With multiple, multi-level sub-headings
+  (check-func-at-point 'moin-command-meta-shift-left
+	     "Anytext before\n== Heading 1 ==\nAny text behind\n=== H2.1 ===\nsubtext\n\n==== H3.1 ====\nsubtext\n==== H3.2 ====\nAny \nsub \ntext\n=== H2.2 ===\nHallo"
+		       29 28
+	     "Anytext before\n= Heading 1 =\nAny text behind\n== H2.1 ==\nsubtext\n\n=== H3.1 ===\nsubtext\n=== H3.2 ===\nAny \nsub \ntext\n== H2.2 ==\nHallo")
+  ;; With multiple, multi-level sub-headings, and sibling headings
+  (check-func-at-point 'moin-command-meta-shift-left
+	     "Anytext before\n== Heading 1 ==\nAny text behind\n=== H2.1 ===\nsubtext\n\n==== H3.1 ====\nsubtext\n==== H3.2 ====\nAny \nsub \ntext\n=== H2.2 ===\nHallo\n== Sibling Heading 1 ==\nAny text behind\n=== SH2.1 ===\nsubtext\n== Sibling Heading 2 ==\n"
+		       29 28
+	     "Anytext before\n= Heading 1 =\nAny text behind\n== H2.1 ==\nsubtext\n\n=== H3.1 ===\nsubtext\n=== H3.2 ===\nAny \nsub \ntext\n== H2.2 ==\nHallo\n== Sibling Heading 1 ==\nAny text behind\n=== SH2.1 ===\nsubtext\n== Sibling Heading 2 ==\n")
+  (check-func-at-point 'moin-command-meta-shift-left
+	     "Anytextfore\n== Heading 1 ==\nAny text behind\n=== H2.1 ===\nsubtext\n\n==== H3.1 ====\nsubtext\n==== H3.2 ====\nAny \nsub \ntext\n=== H2.2 ===\nHallo\n== Sibling Heading 1 ==\nAny text behind\n=== SH2.1 ===\nsubtext\n= Sibling Heading 2 =\n"
+		       143 142
+	     "Anytextfore\n== Heading 1 ==\nAny text behind\n=== H2.1 ===\nsubtext\n\n==== H3.1 ====\nsubtext\n==== H3.2 ====\nAny \nsub \ntext\n=== H2.2 ===\nHallo\n= Sibling Heading 1 =\nAny text behind\n== SH2.1 ==\nsubtext\n= Sibling Heading 2 =\n"))
 
 
-(defun test-moin--check-change-level(command-left command-right pre-text heading-text
-			    subtree post-text start-level start-pos &optional subtree-change-func)
-  "Inserts any prefix text, then a heading-text with the given start level
-(should be on its own line, the prefix and postfix text must contain the
-corresponding line breaks) as well as a postfix text into a new temporary
-buffer, then goes to the specified start position (which should be on the
-heading line) and executes a number of change level commands. Then it checks
-their outcome."
-  (with-temp-buffer
-    (moin-mode)
+(ert-deftest test-moin--promote-heading-with-subtree-error()
+  "Checks `moin-command-meta-shift-left' for headings in error situations."
+  ;; Cannot promote further
+  (check-func-at-point-throws-error 'moin-command-meta-shift-left
+   				    "= Hallo =" 8 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-shift-left
+   				    "= =" 1 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-shift-left
+    "Anytext before\n= Heading 1 =\nAny text behind\n==== H2.1 ====\nsubtext\n\n===== H3.1 =====\nsubtext\n===== H3.2 =====\nAny \nsub \ntext\n==== H2.2 ====\nHallo" 19 'user-error)
+  ;; Not supported for active mark
+  (check-func-at-point-throws-error 'moin-command-meta-shift-left
+   				    "=== Hallo ===" 6 'user-error 3))
 
-    ;; Build the initial buffer contents
-    (setq heading-line (test-moin--make-heading heading-text start-level))
-
-    (insert
-     (concat pre-text heading-line
-     	 subtree post-text))
-    (goto-char start-pos)
-    (setq expect-point-at-bol-p (<= (current-column) start-level))
-
-    (test-moin--repeat-change-level command-right '<
-         moin-const-max-heading-level '+ start-level subtree-change-func)
-    (test-moin--repeat-change-level command-left  '>
-         1                            '- moin-const-max-heading-level subtree-change-func)))
-
-;; TODO: Test `moin-command-meta-shift-left' for headings, i.e. demote incl. subtree
-;; TODO: Test `moin-command-meta-shift-right' for headings, i.e. promote incl. subtree
 ;; TODO: Test `moin-command-meta-up' for headings, i.e. move up
 ;; TODO: Test `moin-command-meta-down' for headings, i.e. move down
 ;; TODO: Test `moin-command-tab' for headings, i.e. outline cycle 
-
-
-(defun test-moin--repeat-change-level (command compare-func compare-level change-func curr-level &optional subtree-change-func)
-  "Repeatedly performs command at current point, as long as an invocation of compare-func, 
-comparing curr-level with compare level is true. Within the loop, curr-level and curr-pos are
-changed after the command call using change-func, and finally some checking of expected buffer
-content is done. It additional can execute a subtree change function to transform the subtree 
-in some expected way before comparing it with the actual buffer content."
-  (setq curr-pos (point))
-  (while (funcall compare-func curr-level compare-level)
-    (funcall command)
-    (message "test-moin--check-change-level: buffer after command call: %s" (buffer-string))
-    (setq curr-level (funcall change-func curr-level 1))
-    
-    (setq heading-line (test-moin--make-heading heading-text curr-level))
-    
-    (setq curr-pos (funcall change-func curr-pos 1))
-    
-    ;; Point should not change by the command
-    (if expect-point-at-bol-p
-	(should (equal (point-at-bol) (point)))
-      (should (equal curr-pos (point))))
-
-    ;; We must not change point position as the test case goes
-    ;; on into the next loop
-    (save-excursion
-      (beginning-of-line)
-      (should (looking-at (concat "^" heading-line "$"))))
-    
-    ;; Rest of the buffer should be unchanged
-    (should (equal (concat pre-text heading-line subtree post-text) (buffer-string))))
-
-  ;; Another invocation must fail as we are already on lowest or highest level
-  (should-error (funcall command) :type 'user-error))
 
 
 ;; ==================================================
@@ -526,9 +579,9 @@ in some expected way before comparing it with the actual buffer content."
   "Tests `moin--table-create' in positive cases"
   (test-moin--table-create-positive "" "" "1x1" 4 "||  ||\n\n")
   (test-moin--table-create-positive "" "" "3x1" 4 "||  ||  ||  ||\n\n")
-  (test-moin--table-create-positive "Hallo" "Jens" "4x3" 15 "\n\n||  ||  ||  ||  ||\n||  ||  ||  ||  ||\n||  ||  ||  ||  ||\n")
+  (test-moin--table-create-positive "Hallo" "Test" "4x3" 15 "\n\n||  ||  ||  ||  ||\n||  ||  ||  ||  ||\n||  ||  ||  ||  ||\n")
   (test-moin--table-create-positive "Hallo\n" "" "2x4" 10 "||  ||  ||\n||  ||  ||\n||  ||  ||\n||  ||  ||\n\n")
-  (test-moin--table-create-positive "" "Jens" "1x2" 4 "||  ||\n||  ||\n\n"))
+  (test-moin--table-create-positive "" "Test" "1x2" 4 "||  ||\n||  ||\n\n"))
 
 
 (defun test-moin--table-create-positive (pre-text post-text size-string expected-point expected-table)
