@@ -138,50 +138,54 @@ shown entirely, no folding"
 	  "SUBTREE")))))
 
 
-(defun moin--heading-move-subtree-up-or-down (&optional arg)
+(defun moin--heading-move-subtree-up-or-down (arg)
   "Move the current subtree up or down past ARG headlines of the same level.
 This is a bugfix version of outline-move-subtree-down copied from
 Emacs 25.1, slightly adapted. See GNU Emacs bug#19102. Only uses the 
 bugfix code if emacs major version is < 25."
   (interactive "p")
-  (if (< emacs-major-version 25)
-      (progn 
-	(outline-back-to-heading)
-	(let* ((movfunc (if (> arg 0) 'outline-get-next-sibling
-			  'outline-get-last-sibling))
-	       ;; Find the end of the subtree to be moved as well as the point to
-	       ;; move it to, adding a newline if necessary, to ensure these points
-	       ;; are at bol on the line below the subtree.
-	       (end-point-func (lambda ()
-				 (outline-end-of-subtree)
-				 (if (eq (char-after) ?\n) (forward-char 1)
-				   (if (and (eobp) (not (bolp))) (insert "\n")))
-				 (point)))
-	       (beg (point))
-	       (folded (save-match-data
-			 (outline-end-of-heading)
-			 (outline-invisible-p)))
-	       (end (save-match-data
-		      (funcall end-point-func)))
-	       (ins-point (make-marker))
-	       (cnt (abs arg)))
-	  ;; Find insertion point, with error handling.
-	  (goto-char beg)
-	  (while (> cnt 0)
-	    (or (funcall movfunc)
-		(progn (goto-char beg)
-		       (user-error "Cannot move past superior level")))
-	    (setq cnt (1- cnt)))
-	  (if (> arg 0)
-	      ;; Moving forward - still need to move over subtree.
-	      (funcall end-point-func))
-	  (move-marker ins-point (point))
-	  (insert (delete-and-extract-region beg end))
-	  (goto-char ins-point)
-	  (if folded (hide-subtree))
-	  (move-marker ins-point nil)))
-    ;; else if emacs major version >= 25
-    (outline-move-subtree-dowh arg)))
+  (let ((current-column (current-column)))
+    
+    (if (< emacs-major-version 25)
+	(progn 
+	  (outline-back-to-heading)
+	  (let* ((movfunc (if (> arg 0) 'outline-get-next-sibling
+			    'outline-get-last-sibling))
+		 ;; Find the end of the subtree to be moved as well as the point to
+		 ;; move it to, adding a newline if necessary, to ensure these points
+		 ;; are at bol on the line below the subtree.
+		 (end-point-func (lambda ()
+				   (outline-end-of-subtree)
+				   (if (eq (char-after) ?\n) (forward-char 1)
+				     (if (and (eobp) (not (bolp))) (insert "\n")))
+				   (point)))
+		 (beg (point))
+		 (folded (save-match-data
+			   (outline-end-of-heading)
+			   (outline-invisible-p)))
+		 (end (save-match-data
+			(funcall end-point-func)))
+		 (ins-point (make-marker))
+		 (cnt (abs arg)))
+	    ;; Find insertion point, with error handling.
+	    (goto-char beg)
+	    (while (> cnt 0)
+	      (or (funcall movfunc)
+		  (progn (goto-char beg)
+			 (user-error "Cannot move past superior level")))
+	      (setq cnt (1- cnt)))
+	    (if (> arg 0)
+		;; Moving forward - still need to move over subtree.
+		(funcall end-point-func))
+	    (move-marker ins-point (point))
+	    (insert (delete-and-extract-region beg end))
+	    (goto-char ins-point)
+	    (if folded (hide-subtree))
+	    (move-marker ins-point nil)))
+      ;; else if emacs major version >= 25
+      (outline-move-subtree-dowh arg))
+
+    (move-to-column current-column)))
 
 
 (defun moin--heading-execute-action-on-subtree (action &optional initial-level curr-level)

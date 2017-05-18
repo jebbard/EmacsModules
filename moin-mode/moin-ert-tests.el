@@ -551,8 +551,99 @@ without a heading before."
   (check-func-at-point-throws-error 'moin-command-meta-shift-left
    				    "=== Hallo ===" 6 'user-error 3))
 
-;; TODO: Test `moin-command-meta-up' for headings, i.e. move up
-;; TODO: Test `moin-command-meta-down' for headings, i.e. move down
+
+(ert-deftest test-moin--move-heading-up()
+  "Checks `moin-command-meta-up' for headings."
+  (test-moin--run-move-heading-up 'moin-command-meta-up))
+
+
+(ert-deftest test-moin--move-heading-up-shift()
+  "Checks `moin-command-meta-shift-up' for headings."
+  (test-moin--run-move-heading-up 'moin-command-meta-shift-up))
+
+
+(defun test-moin--run-move-heading-up(command)
+  "Checks moving up of headings."
+  ;; Headings without sub-headings
+  (check-func-at-point command
+		       "= Heading 1 =\n= Heading 2 =" 15 1 "= Heading 2 =\n= Heading 1 =\n")
+  (check-func-at-point command
+		       "= Heading 1 =\n= Heading 2 =\n" 25 11 "= Heading 2 =\n= Heading 1 =\n")
+  ;; Headings with sub-headings
+  (check-func-at-point command
+		       "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =" 54 3
+		       "= Heading 2 =\n= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n")
+  (check-func-at-point command
+		       "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =\n== Heading 2.1 ==\nAnyOther text\n=== Heading 3.1 ===\nAnyOther text\n== Heading 2.2 ==\nAnyOther text\n= Heading 3 =" 64 13
+		       "= Heading 2 =\n== Heading 2.1 ==\nAnyOther text\n=== Heading 3.1 ===\nAnyOther text\n== Heading 2.2 ==\nAnyOther text\n= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 3 ="))
+
+
+(ert-deftest test-moin--move-heading-up-error()
+  "Checks `moin-command-meta-up' for headings in error situations."
+  (test-moin--run-move-heading-up-error 'moin-command-meta-up))
+
+
+(ert-deftest test-moin--move-heading-up-shift-error()
+  "Checks `moin-command-meta-shift-up' for headings in error situations."
+  (test-moin--run-move-heading-up-error 'moin-command-meta-shift-up))
+
+(defun test-moin--run-move-heading-up-error(command)
+  "Checks moving up of headings."
+  (check-func-at-point-throws-error command
+		       "= Heading 1 =\n= Heading 2 =" 1 'error)
+  ;; On first sub-heading
+  (check-func-at-point-throws-error command
+		       "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =" 22 'error)
+  (check-func-at-point-throws-error command
+		       "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =\n== Heading 2.1 ==\nAnyOther text\n=== Heading 3.1 ===\nAnyOther text\n== Heading 2.2 ==\nAnyOther text\n= Heading 3 =" 103 'error))
+
+
+(ert-deftest test-moin--move-heading-down()
+  "Checks `moin-command-meta-down' for headings."
+  (test-moin--run-move-heading-down 'moin-command-meta-down))
+
+
+(ert-deftest test-moin--move-heading-down-shift()
+  "Checks `moin-command-meta-shift-down' for headings."
+  (test-moin--run-move-heading-down 'moin-command-meta-shift-down))
+
+
+(defun test-moin--run-move-heading-down(command)
+  "Checks moving down of headings."
+  ;; Headings without sub-headings
+  (check-func-at-point command
+		       "= Heading 1 =\n= Heading 2 =" 1 15 "= Heading 2 =\n= Heading 1 =\n")
+  (check-func-at-point command
+		       "= Heading 1 =\n= Heading 2 =\n" 11 25 "= Heading 2 =\n= Heading 1 =\n")
+  ;; Headings with sub-headings
+  (check-func-at-point command
+  		       "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =" 3 17
+  		       "= Heading 2 =\n= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n")
+  (check-func-at-point command
+  		       "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =\n== Heading 2.1 ==\nAnyOther text\n=== Heading 3.1 ===\nAnyOther text\n== Heading 2.2 ==\nAnyOther text\n= Heading 3 =" 13 125
+  		       "= Heading 2 =\n== Heading 2.1 ==\nAnyOther text\n=== Heading 3.1 ===\nAnyOther text\n== Heading 2.2 ==\nAnyOther text\n= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 3 ="))
+
+
+(ert-deftest test-moin--move-heading-down-error()
+  "Checks `moin-command-meta-down' for headings in error situations."
+  (test-moin--run-move-heading-down-error 'moin-command-meta-down))
+
+
+(ert-deftest test-moin--move-heading-down-shift-error()
+  "Checks `moin-command-meta-shift-down' for headings in error situations."
+  (test-moin--run-move-heading-down-error 'moin-command-meta-shift-down))
+
+(defun test-moin--run-move-heading-down-error(command)
+  "Checks moving down of headings."
+  (check-func-at-point-throws-error command
+				    "= Heading 1 =\n= Heading 2 =" 19 'error)
+  ;; On last sub-heading
+  (check-func-at-point-throws-error command
+				    "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =" 22 'error)
+  (check-func-at-point-throws-error command
+				    "= Heading 1 =\ntext\n== Heading 1.1 ==\nAnyOther text\n= Heading 2 =\n== Heading 2.1 ==\nAnyOther text\n=== Heading 3.1 ===\nAnyOther text\n== Heading 2.2 ==\nAnyOther text\n= Heading 3 =" 103 'error))
+  
+
 ;; TODO: Test `moin-command-tab' for headings, i.e. outline cycle 
 
 

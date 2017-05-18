@@ -240,9 +240,9 @@ item below its parent item."
   (if (moin-is-in-table-p)
       (moin--table-remove-row arg)
     (if (moin-is-in-list-p)
-	(moin--list-move-subtree-up arg)
+	(moin--list-move-subtree-up -1)
       (if (moin-is-on-heading-p)
-	  (moin--heading-move-subtree-up-or-down (- arg))))))
+	  (moin--heading-move-subtree-up-or-down -1)))))
 
 
 (defun moin-command-meta-shift-down (&optional arg)
@@ -262,9 +262,9 @@ item below its parent item."
   (if (moin-is-in-table-p)
       (moin--table-insert-row t)
     (if (moin-is-in-list-p)
-	(moin--list-move-subtree-down arg)
+	(moin--list-move-subtree-down 1)
       (if (moin-is-on-heading-p)
-	  (moin--heading-move-subtree-up-or-down arg)))))
+	  (moin--heading-move-subtree-up-or-down 1)))))
 
 
 (defun moin-command-meta-up (&optional arg)
@@ -279,8 +279,10 @@ with previous row), if it is not already the first row in the table."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-move-row-up arg)
-    (if (or (moin-is-in-list-p) (moin-is-on-heading-p))
-	(moin-command-meta-shift-up arg))))
+    (if (moin-is-in-list-p)
+	(moin--list-move-subtree-down -1)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-move-subtree-up-or-down -1)))))
 
 
 (defun moin-command-meta-down (&optional arg)
@@ -295,8 +297,10 @@ with next row), if it is not already the last row in the table."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-move-row-down arg)
-    (if (or (moin-is-in-list-p) (moin-is-on-heading-p))
-	(moin-command-meta-shift-down arg))))
+    (if (moin-is-in-list-p)
+	(moin--list-move-subtree-down 1)
+      (if (moin-is-on-heading-p)
+	  (moin--heading-move-subtree-up-or-down 1)))))
 
 
 (defun moin-command-meta-shift-left (&optional arg)
