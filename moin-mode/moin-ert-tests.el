@@ -1084,6 +1084,122 @@ Expectations are given in the list form (current-column (start-point end-point c
    'moin-command-meta-down "Any other text\n|| abc||def ||\nAny other text" 17 'user-error))
 
 
+(ert-deftest test-moin-move-column-left ()
+  "Tests `moin-command-meta-left' for tables"
+  
+  (check-func-at-point 'moin-command-meta-left
+		       "|| ab || cd ||" 10 3 "|| cd || ab ||")
+  (check-func-at-point 'moin-command-meta-left
+ 		       "|| abc||def || xyz   ||\n|| ||      ||||" 36 27
+ 		       "||def || abc|| xyz   ||\n||      || ||||")
+  (check-func-at-point 'moin-command-meta-left
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 9 3
+  		       "||def || abc|| xyz   ||\n||      || ||||\n|| rg ||tr|| xy ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-left
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 36 27
+  		       "||def || abc|| xyz   ||\n||      || ||||\n|| rg ||tr|| xy ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-left
+ 		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 58 47
+ 		       "|| abc|| xyz   ||def ||\n|| ||||      ||\n||tr|| xy || rg ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-left
+		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 59 47
+		       "|| abc|| xyz   ||def ||\n|| ||||      ||\n||tr|| xy || rg ||\nAny Text")
+  ;; A longer table, 4 columns, 5 rows (row start points of table: 17, 42, 69, 86, 110)
+  (setq multi-column-multi-row-table-string "Any text before\n|| ab||cd || ef   ||gh||\n||ij|| k ||     lm   ||o||\n||||p || q  ||||\n|| r||stuvw || x   ||||\n|| y||        || z   ||||\n")
+  ;; Move second column left in first row
+  (check-func-at-point 'moin-command-meta-left
+       multi-column-multi-row-table-string 24 19
+       "Any text before\n||cd || ab|| ef   ||gh||\n|| k ||ij||     lm   ||o||\n||p |||| q  ||||\n||stuvw || r|| x   ||||\n||        || y|| z   ||||\n")
+  ;; Move third column left in third row
+  (check-func-at-point 'moin-command-meta-left
+       multi-column-multi-row-table-string 80 73
+       "Any text before\n|| ab|| ef   ||cd ||gh||\n||ij||     lm   || k ||o||\n|||| q  ||p ||||\n|| r|| x   ||stuvw ||||\n|| y|| z   ||        ||||\n")
+  ;; Move fourth column left in last row
+  (check-func-at-point 'moin-command-meta-left
+       multi-column-multi-row-table-string 134 126
+"Any text before\n|| ab||cd ||gh|| ef   ||\n||ij|| k ||o||     lm   ||\n||||p |||| q  ||\n|| r||stuvw |||| x   ||\n|| y||        |||| z   ||\n"))
+
+
+(ert-deftest test-moin-move-column-left-error ()
+  "Tests `moin-command-meta-left' for tables in error cases"
+
+  ;; Throws error when issued in first column
+  (check-func-at-point-throws-error 'moin-command-meta-left
+		       "|| ab || cd ||" 7 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-left
+		       "|| ab || cd ||" 1 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-left
+		       "|| ab || cd ||" 8 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-left
+ 		       "|| abc||def || xyz   ||\n|| ||      ||||" 26 'user-error)
+  ;; Throws error when any other row is malformed (does not have enough columns)
+  (check-func-at-point-throws-error 'moin-command-meta-left
+ 		       "|| abc||def || xyz   ||\n|| ||      ||" 16 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-left
+ 		       "|| abc||def ||\n|| ||      || gb ||" 31 'user-error))
+
+
+(ert-deftest test-moin-move-column-right ()
+  "Tests `moin-command-meta-right' for tables"
+  
+  (check-func-at-point 'moin-command-meta-right
+		       "|| ab || cd ||" 3 9 "|| cd || ab ||")
+  (check-func-at-point 'moin-command-meta-right
+ 		       "|| abc||def || xyz   ||\n|| ||      ||||" 27 35
+ 		       "||def || abc|| xyz   ||\n||      || ||||")
+  (check-func-at-point 'moin-command-meta-right
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 3 9
+  		       "||def || abc|| xyz   ||\n||      || ||||\n|| rg ||tr|| xy ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-right
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 27 35
+  		       "||def || abc|| xyz   ||\n||      || ||||\n|| rg ||tr|| xy ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-right
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 47 53
+  		       "|| abc|| xyz   ||def ||\n|| ||||      ||\n||tr|| xy || rg ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-right
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 51 53
+  		       "|| abc|| xyz   ||def ||\n|| ||||      ||\n||tr|| xy || rg ||\nAny Text")
+  ;; A longer table, 4 columns, 5 rows (row start points of table: 17, 42, 69, 86, 110)
+  (setq multi-column-multi-row-table-string "Any text before\n|| ab||cd || ef   ||gh||\n||ij|| k ||     lm   ||o||\n||||p || q  ||||\n|| r||stuvw || x   ||||\n|| y||        || z   ||||\n")
+  ;; Move first column right in first row
+  (check-func-at-point 'moin-command-meta-right
+       multi-column-multi-row-table-string 19 24
+       "Any text before\n||cd || ab|| ef   ||gh||\n|| k ||ij||     lm   ||o||\n||p |||| q  ||||\n||stuvw || r|| x   ||||\n||        || y|| z   ||||\n")
+  ;; Move second column right in third row
+  (check-func-at-point 'moin-command-meta-right
+       multi-column-multi-row-table-string 73 79
+       "Any text before\n|| ab|| ef   ||cd ||gh||\n||ij||     lm   || k ||o||\n|||| q  ||p ||||\n|| r|| x   ||stuvw ||||\n|| y|| z   ||        ||||\n")
+  ;; Move third column right in last row
+  (check-func-at-point 'moin-command-meta-right
+       multi-column-multi-row-table-string 130 128
+       "Any text before\n|| ab||cd ||gh|| ef   ||\n||ij|| k ||o||     lm   ||\n||||p |||| q  ||\n|| r||stuvw |||| x   ||\n|| y||        |||| z   ||\n")
+  )
+
+
+(ert-deftest test-moin-move-column-right-error ()
+  "Tests `moin-command-meta-right' for tables in error cases"
+
+  ;; Throws error when issued in first column
+  (check-func-at-point-throws-error 'moin-command-meta-right
+		       "|| ab || cd ||" 9 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+		       "|| ab || cd ||" 11 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+		       "|| ab || cd ||" 15 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+ 		       "|| abc||def || xyz   ||\n|| ||      ||||" 38 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+ 		       "|| abc||def || xyz   ||\n|| ||      ||||" 39 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+ 		       "|| abc||def || xyz   ||\n|| ||      ||||" 40 'user-error)
+
+  ;; Throws error when any other row is malformed (does not have enough columns)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+  		       "|| abc||def || xyz   ||\n|| ||" 13 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+         	       "|| abc||\n|| ||      || gb ||" 16 'user-error))
+
+
 ;; ==================================================
 ;; Testing list functions
 

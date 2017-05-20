@@ -58,6 +58,33 @@
 ;; ==================================================
 ;; "Private" Functions
 
+
+(defun moin--table-goto-previous-row ()
+  "Tries to move to the beginning of the previous table row, if any.
+Returns t if there is a previous line that is a table row, nil otherwise.
+If there is a previous line, it remains there, even if it might not be 
+a table row."
+  (beginning-of-line)
+  (if (bobp)
+      nil
+    (progn
+      (previous-line)
+      (moin-is-in-table-p))))
+
+
+(defun moin--table-goto-next-row ()
+  "Tries to move to the end of the next table row, if any.
+Returns t if there is a next line that is a table row, nil otherwise.
+If there is a next line, it remains there, even if it might not be 
+a table row."
+  (end-of-line)
+  (if (eobp)
+      nil
+    (progn
+      (next-line)
+      (moin-is-in-table-p))))
+
+
 (defun moin--table-next-row (mode)
   "See `moin-command-table-next-row' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
@@ -190,14 +217,8 @@ function if point is currently not in a table."
 	  ;; column in the previous row, if any
 	  (if (eq current-table-column 1)
 	      (progn
-		(beginning-of-line)
-		
-		(if (bobp)
-		    (user-error "No previous field in this table")
-		  (previous-line))
-
-		(if (not (moin-is-in-table-p))
- 		    (user-error "No previous field in this table"))
+		(if (not (moin--table-goto-previous-row))
+		    (user-error "No previous field in this table"))
 
 		(setq previous-column-details (moin--table-determine-column-details))
 		(setq previous-column-info (nth
@@ -287,18 +308,110 @@ the end of the field text, i.e. after the padding blank."
 	(replace-match new-field-text nil t))))
 
 
+(defun moin--table-do-swap (leftmost-column-info rightmost-column-info)
+  "Performs actual table swapping by replacing strings belonging to different
+table columns in the current row."
+  (setq leftmost-text (car (cdr (cdr leftmost-column-info))))
+  (setq leftmost-start-point (car leftmost-column-info))
+  (setq leftmost-end-point (car (cdr leftmost-column-info)))
+  
+  (setq rightmost-text (car (cdr (cdr rightmost-column-info))))
+  (setq rightmost-start-point (car rightmost-column-info))
+  (setq rightmost-end-point (car (cdr rightmost-column-info)))
+  
+  (setq text-between-columns
+	(buffer-substring-no-properties leftmost-end-point rightmost-start-point))
+
+  (setq string-to-replace
+	(buffer-substring-no-properties leftmost-start-point rightmost-end-point))
+
+  (setq replacement-string
+	(concat rightmost-text text-between-columns leftmost-text))
+  
+  (goto-char leftmost-start-point)
+  
+  (if (search-forward string-to-replace rightmost-end-point t)
+      (replace-match replacement-string t t)
+    (user-error "Illegal state - did not find buffer string to replace, terminating function")))
+
+
+(defun moin--table-swap-columns(current-row-column-details current-table-column swap-left)
+  "Swaps the current-table-column of a moin table with its next - if swap-left is non-nil - or next
+ - if swap-left is nil - column. If there is no such column, throws an error. The details of the 
+current row must be determined before and passes in the parameter current-row-column-details."
+  (let (current-column-info
+	current-column-text
+	current-column-start-point
+	current-column-end-point
+	other-column-info
+	other-column-text
+	other-column-start-point
+	other-column-end-point
+	text-between-columns
+	string-to-replace
+	replacement-string)
+    
+    (if (or (and swap-left (eq current-table-column 1))
+	    (and (not swap-left) (eq current-table-column (- (length current-row-column-details) 1))))
+      (user-error "Cannot move column further"))
+
+  (if (eq (length current-row-column-details) current-table-column)
+      (user-error "Malformed table, not enough columns in current row"))
+  
+  (setq current-column-info (nth current-table-column current-row-column-details))
+  
+  (if swap-left
+      (progn
+	(setq other-column-info (nth (- current-table-column 1) current-row-column-details))
+	(moin--table-do-swap other-column-info current-column-info)
+	(setq other-column-start-point (car other-column-info))
+	(goto-char other-column-start-point))
+    (progn
+      (setq other-column-info (nth (+ current-table-column 1) current-row-column-details))
+      (moin--table-do-swap current-column-info other-column-info)
+      (setq current-column-start-point (car current-column-info))
+      (setq other-column-text (car (cdr (cdr other-column-info))))
+      (goto-char
+       (+ current-column-start-point (length other-column-text) (length moin-const-table-delimiter)))))))
+
+
+(defun moin--table-move-column (left)
+  "Moves the current column left (if left is non-nil) or right otherwise."
+  (let (current-row-column-details current-table-column)
+
+    (setq current-row-column-details (moin--table-determine-column-details))
+    (setq current-table-column (car current-row-column-details))
+
+    ;; Swap columns in current table row
+    (moin--table-swap-columns current-row-column-details current-table-column left)
+    
+    ;; Swap columns in previous table rows
+    (save-excursion
+      (while (moin--table-goto-previous-row)
+	(setq current-row-column-details (moin--table-determine-column-details))
+
+	(moin--table-swap-columns current-row-column-details current-table-column left)))
+    
+    ;; Swap columns in next table rows
+    (save-excursion
+      (while (moin--table-goto-next-row)
+	(setq current-row-column-details (moin--table-determine-column-details))
+
+	(moin--table-swap-columns current-row-column-details current-table-column left)))))
+
+
 (defun moin--table-move-column-right (&optional arg)
   "See `moin-command-meta-right' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (moin--table-move-column nil))
 
 
 (defun moin--table-move-column-left (&optional arg)
   "See `moin-command-meta-left' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (moin--table-move-column t))
 
 
 (defun moin--table-insert-column (&optional arg)
@@ -319,19 +432,12 @@ function if point is currently not in a table."
   "See `moin-command-meta-down' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (let ((error-text "Cannot move row further")
-    	current-column)
+  (let (current-column)
 
     (save-excursion
       ;; Check if there is a row below or this is the last row
-      (end-of-line)
-      (if (eobp)
-    	  (user-error error-text))
-
-      (next-line)
-
-      (if (not (moin-is-in-table-p))
-    	  (user-error error-text)))
+      (if (not (moin--table-goto-next-row))
+	  (user-error "Cannot move row further")))
     
     (setq current-column (current-column))
 
@@ -347,19 +453,12 @@ function if point is currently not in a table."
   "See `moin-command-meta-up' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (let ((error-text "Cannot move row further")
-    	current-column)
+  (let (current-column)
 
     (save-excursion
       ;; Check if there is a row above or this is the first row
-      (beginning-of-line)
-      (if (bobp)
-    	  (user-error error-text))
-
-      (previous-line)
-
-      (if (not (moin-is-in-table-p))
-    	  (user-error error-text)))
+      (if (not (moin--table-goto-previous-row))
+	  (user-error "Cannot move row further")))
     
     (setq current-column (current-column))
 
@@ -412,8 +511,8 @@ function if point is currently not in a table."
 
     (setq current-column (current-column))
 
-    (end-of-line)
     (setq del-start-point (point-at-bol))
+    (end-of-line)
     
     (if (eobp)
 	(setq del-end-point (point-at-eol))
@@ -446,10 +545,10 @@ The column details are presented in a list containing the following
 column index in the current row where point is currently in, which then can
 also be used as index on this entire returned list for getting the current
 column details. In the special case that point is located before the first
-column content starts, the current-column is nevertheless set to 1. In all 
-other cases where point is in between the two delimiters '||' of the moin
-table (including the case where point is behind the last character of the last
-field of the current row), it is seen to be still located in previous column.
+column content starts, the current-column is nevertheless set to 1. If point
+is in between the two delimiters '||' of the moin table, it is seen to be
+still located in previous column. In case point is at the end of line, it is 
+considered to be in the last column.
 * All other entries have the form (start-point end-point content) where 'start-point' is 
 an integer with the buffer's point value of the first character directly after
 '||', i.e. where the column content begins, 'end-point' is an integer with the buffer's 

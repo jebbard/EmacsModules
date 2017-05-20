@@ -356,7 +356,9 @@ its children unchanged, but only if the current heading is not already on level 
 This command does not work with an active mark, which will lead to an error
 message. It also fixes errors in the end marker of the heading, if necessary.
 * If point is currently in a table, it moves the current column of the
-table to the left, but only if it is not already the left-most column.
+table to the left, but only if it is not already the left-most column. Point is 
+set to be at the start of the column directly behind the column delimiter after
+movement.
 * If point is currently in a list, it decreases the indentation, leaving its
 children unchanged. A single item's indentation can only be decreased if it is
 not already on the left-most indentation level of the list. Furthermore, if the
