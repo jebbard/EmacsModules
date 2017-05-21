@@ -43,6 +43,9 @@
   (regexp-quote moin-const-table-delimiter)
   "The MoinMoin table delimiter in a regexp quoted form.")
 
+(defconst moin-const-empty-field-with-left-delimiter
+  (concat moin-const-table-delimiter "  ")
+  "Empty field content (two blanks) with the left table delimiter.")
 
 ;; ==================================================
 ;; Functions
@@ -349,14 +352,14 @@ current row must be determined before and passes in the parameter current-row-co
 	other-column-end-point
 	text-between-columns
 	string-to-replace
-	replacement-string)
+	replacement-string
+	column-count)
+
+    (setq column-count (- (length current-row-column-details) 1))
     
     (if (or (and swap-left (eq current-table-column 1))
-	    (and (not swap-left) (eq current-table-column (- (length current-row-column-details) 1))))
+	    (and (not swap-left) (eq current-table-column column-count)))
       (user-error "Cannot move column further"))
-
-  (if (eq (length current-row-column-details) current-table-column)
-      (user-error "Malformed table, not enough columns in current row"))
   
   (setq current-column-info (nth current-table-column current-row-column-details))
   
@@ -375,57 +378,137 @@ current row must be determined before and passes in the parameter current-row-co
        (+ current-column-start-point (length other-column-text) (length moin-const-table-delimiter)))))))
 
 
-(defun moin--table-move-column (left)
-  "Moves the current column left (if left is non-nil) or right otherwise."
-  (let (current-row-column-details current-table-column)
+(defun moin--table-execute-function-per-row (function &optional args)
+  "Executes a functin for each row of the current table. This function assumes that it is 
+already in a table. It gets the current-row-column-details, and executes the given function
+first for the current row, then for all previous rows (if any), and finally for all upcoming
+table rows (if any). The function must take the current-row-column-details as first and 
+the current-table-column as second argument. It can take arbitrary additional args that
+can be passed to this function."
+  (let (current-row-column-details current-table-column	column-count)
+
+    (setq column-count (- (length current-row-column-details) 1))
 
     (setq current-row-column-details (moin--table-determine-column-details))
     (setq current-table-column (car current-row-column-details))
 
-    ;; Swap columns in current table row
-    (moin--table-swap-columns current-row-column-details current-table-column left)
+    (moin--table-check-row current-row-column-details current-table-column)
+
+    ;; Perform function in current table row
+    (funcall function current-row-column-details current-table-column args)
     
-    ;; Swap columns in previous table rows
+    ;; Perform function in previous table rows (if any)
     (save-excursion
       (while (moin--table-goto-previous-row)
 	(setq current-row-column-details (moin--table-determine-column-details))
 
-	(moin--table-swap-columns current-row-column-details current-table-column left)))
+	(moin--table-check-row current-row-column-details current-table-column)
+
+	(funcall function current-row-column-details current-table-column args)))
     
-    ;; Swap columns in next table rows
+    ;; Perform function in next table rows (if any)
     (save-excursion
       (while (moin--table-goto-next-row)
 	(setq current-row-column-details (moin--table-determine-column-details))
 
-	(moin--table-swap-columns current-row-column-details current-table-column left)))))
+	(moin--table-check-row current-row-column-details current-table-column)
+
+	(funcall function current-row-column-details current-table-column args)))))
+
+
+(defun moin--table-check-row (current-row-column-details current-table-column)
+  "Checks the current table row for having at least current-table-column columns.
+If that is not the case, it throws a corresponding error."
+  (let (column-count)
+    (setq column-count (- (length current-row-column-details) 1))
+    
+    (if (eq (+ 1 column-count) current-table-column)
+	(user-error "Malformed table, not enough columns in current row"))))
+
+
+(defun moin--table-do-remove-column (current-row-column-details current-table-column &optional arg)
+  "Performs actual removal of the current-table-column, based on the information contained in
+current-row-column-details. The last argument is just a dummy never used, it is just needed such
+that `moin--table-execute-function-per-row' can be used to trigger this function."
+  (let (current-column-info
+	current-column-start-point
+	current-column-end-point
+	previous-column-info
+	previous-column-start-point
+	column-count)
+
+    (setq column-count (- (length current-row-column-details) 1))
+    
+    (setq current-column-info (nth current-table-column current-row-column-details))
+    
+    (setq current-column-start-point (car current-column-info))
+    (setq current-column-end-point (car (cdr current-column-info)))
+
+    (goto-char current-column-start-point)
+
+    (delete-forward-char
+     (- (+ current-column-end-point (length moin-const-table-delimiter)) current-column-start-point) nil)
+
+    ;; Special case that the current table has just the single column to remove
+    (if (eq 1 column-count)
+	(progn
+	  (beginning-of-line)
+	  (delete-forward-char (length moin-const-table-delimiter) nil))
+      ;; Special case: Current column is the last (but not the only) column in the table,
+      ;; Goto the beginning of the previous table column in that special case
+      (if (eq current-table-column column-count)
+	(progn
+	  (setq previous-column-info (nth (- current-table-column 1) current-row-column-details))
+	  (setq previous-column-start-point (car previous-column-info))
+	  (goto-char previous-column-start-point))))))
+
+
+(defun moin--table-do-insert-column (current-row-column-details current-table-column &optional arg)
+  "Performs actual insertion of a new column in fromt of the current-table-column,
+based on the information contained in current-row-column-details. The last argument
+is just a dummy never used, it is just needed such that `moin--table-execute-function-per-row'
+can be used to trigger this function."
+  (let (current-column-info
+	current-column-start-point)
+
+    (setq current-column-info (nth current-table-column current-row-column-details))
+    
+    (setq current-column-start-point (car current-column-info))
+
+    (goto-char current-column-start-point)
+
+    (backward-char (length moin-const-table-delimiter))
+
+    (insert moin-const-empty-field-with-left-delimiter)
+    (backward-char)))
 
 
 (defun moin--table-move-column-right (&optional arg)
   "See `moin-command-meta-right' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (moin--table-move-column nil))
+  (moin--table-execute-function-per-row 'moin--table-swap-columns nil))
 
 
 (defun moin--table-move-column-left (&optional arg)
   "See `moin-command-meta-left' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (moin--table-move-column t))
+  (moin--table-execute-function-per-row 'moin--table-swap-columns t))
 
 
 (defun moin--table-insert-column (&optional arg)
   "See `moin-command-meta-shift-right' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (moin--table-execute-function-per-row 'moin--table-do-insert-column nil))
 
 
 (defun moin--table-remove-column (&optional arg)
   "See `moin-command-meta-shift-left' for more information.
 Expects to actually be in a table as prerequisite. Never call this 
 function if point is currently not in a table."
-  (user-error "Not implemented yet for tables!"))
+  (moin--table-execute-function-per-row 'moin--table-do-remove-column nil))
 
 
 (defun moin--table-move-row-down (&optional arg)
@@ -491,11 +574,10 @@ the same number of columns as the current row."
 	(end-of-line)
 	(newline)))
 
-    (insert moin-const-table-delimiter)
-
     (dotimes (i column-count)
-      (insert "  ")
-      (insert moin-const-table-delimiter))
+      (insert moin-const-empty-field-with-left-delimiter))
+
+    (insert moin-const-table-delimiter)
     
     (move-to-column 3)))
 
@@ -631,8 +713,7 @@ malformed, it throws a user-error."
     
     (dotimes (row rows)
       (dotimes (col cols)
-	(insert moin-const-table-delimiter)
-	(insert "  "))
+	(insert moin-const-empty-field-with-left-delimiter))
       (insert moin-const-table-delimiter)
       (newline))
 

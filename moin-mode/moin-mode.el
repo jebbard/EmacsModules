@@ -312,7 +312,9 @@ already on level 1. This command does not work with an active region,
 which will lead to an error message. It also fixes errors in the end marker 
 of the heading, if necessary.
 * If point is currently in a table, it removes the current column of the
-table.
+table. Point is placed at the beginning of the next column, if any. If there
+is no next column, it is placed at the beginning of the previous column, if
+any.
 * If point is currently in a list, it decreases the indentation of the
 current item with its subtree (i.e. all its children). A subtree's indentation
 can only be decreased if it is not already on the left-most indentation level of 
@@ -335,7 +337,8 @@ already on level 5. This command does not work with an active region,
 which will lead to an error message. It also fixes errors in the end marker 
 of the heading, if necessary.
 * If point is currently in a table, it inserts a new empty column to the 
-left of point.
+left of the current column. Point is places within the same row and the 
+beginning of the new column.
 * If point is currently in a list, it increases the indentation of the
 current item with its subtree (i.e. all its children). An item's indentation
 can only be increased if it is not the first item below its parent."

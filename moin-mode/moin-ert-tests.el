@@ -1200,6 +1200,87 @@ Expectations are given in the list form (current-column (start-point end-point c
          	       "|| abc||\n|| ||      || gb ||" 16 'user-error))
 
 
+(ert-deftest test-moin-remove-column ()
+  "Tests `moin-command-meta-shift-left' for tables"
+  
+  (check-func-at-point 'moin-command-meta-shift-left
+		       "|| ab || cd ||" 10 3 "|| ab ||")
+  (check-func-at-point 'moin-command-meta-shift-left
+  		       "|| ab || cd ||" 8 3 "|| cd ||")
+  (check-func-at-point 'moin-command-meta-shift-left
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 9 9
+  		       "|| abc|| xyz   ||\n|| ||||\n||tr|| xy ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-shift-left
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 25 21
+  		       "||def || xyz   ||\n||      ||||\n|| rg || xy ||\nAny Text")
+  ;; Remove sole column of single-column table
+  (check-func-at-point 'moin-command-meta-shift-left
+  		       "|| abc||\n|| ||\n||tr||\nAny Text" 13 2
+  		       "\n\n\nAny Text")
+  ;; A longer table, 4 columns, 5 rows (row start points of table: 17, 42, 69, 86, 110)
+  (setq multi-column-multi-row-table-string
+  	"Any text before\n|| ab||cd || ef   ||gh||\n||ij|| k ||     lm   ||o||\n||||p || q  ||||\n|| r||stuvw || x   ||||\n|| y||        || z   ||||\n")
+  ;; Remove second column in first row
+  (check-func-at-point 'moin-command-meta-shift-left multi-column-multi-row-table-string 25 24
+        "Any text before\n|| ab|| ef   ||gh||\n||ij||     lm   ||o||\n|||| q  ||||\n|| r|| x   ||||\n|| y|| z   ||||\n")
+  ;; Remove third column in third row
+  (check-func-at-point 'moin-command-meta-shift-left multi-column-multi-row-table-string 80 57
+        "Any text before\n|| ab||cd ||gh||\n||ij|| k ||o||\n||||p ||||\n|| r||stuvw ||||\n|| y||        ||||\n")
+  ;; Remove fourth column in last row
+  (check-func-at-point 'moin-command-meta-shift-left multi-column-multi-row-table-string 134 115
+  		       "Any text before\n|| ab||cd || ef   ||\n||ij|| k ||     lm   ||\n||||p || q  ||\n|| r||stuvw || x   ||\n|| y||        || z   ||\n"))
+
+
+(ert-deftest test-moin-remove-column-error ()
+  "Tests `moin-command-meta-shift-left' for tables in error cases"
+  ;; Throws error when any other row is malformed (does not have enough columns)
+  (check-func-at-point-throws-error 'moin-command-meta-shift-left
+  		       "|| abc||def || xyz   ||\n|| ||" 13 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-shift-left
+         	       "|| abc||\n|| ||      || gb ||" 16 'user-error))
+
+
+(ert-deftest test-moin-insert-column ()
+  "Tests `moin-command-meta-shift-right' for tables"
+  
+  (check-func-at-point 'moin-command-meta-shift-right
+		       "|| ab || cd ||" 10 10 "|| ab ||  || cd ||")
+  (check-func-at-point 'moin-command-meta-shift-right
+  		       "|| ab || cd ||" 8 4 "||  || ab || cd ||")
+  (check-func-at-point 'moin-command-meta-shift-right
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 9 10
+  		       "|| abc||  ||def || xyz   ||\n|| ||  ||      ||||\n||tr||  || rg || xy ||\nAny Text")
+  (check-func-at-point 'moin-command-meta-shift-right
+  		       "|| abc||def || xyz   ||\n|| ||      ||||\n||tr|| rg || xy ||\nAny Text" 25 32
+  		       "||  || abc||def || xyz   ||\n||  || ||      ||||\n||  ||tr|| rg || xy ||\nAny Text")
+  ;; Insert column before sole column of single-column table
+  (check-func-at-point 'moin-command-meta-shift-right
+  		       "|| abc||\n|| ||\n||tr||\nAny Text" 13 17
+  		       "||  || abc||\n||  || ||\n||  ||tr||\nAny Text")
+  ;; A longer table, 4 columns, 5 rows (row start points of table: 17, 42, 69, 86, 110)
+  (setq multi-column-multi-row-table-string
+  	"Any text before\n|| ab||cd || ef   ||gh||\n||ij|| k ||     lm   ||o||\n||||p || q  ||||\n|| r||stuvw || x   ||||\n|| y||        || z   ||||\n")
+  ;; Insert new column, triggered in second column in first row
+  (check-func-at-point 'moin-command-meta-shift-right multi-column-multi-row-table-string 25 25
+        "Any text before\n|| ab||  ||cd || ef   ||gh||\n||ij||  || k ||     lm   ||o||\n||||  ||p || q  ||||\n|| r||  ||stuvw || x   ||||\n|| y||  ||        || z   ||||\n")
+  ;; Insert new column, triggered in third column in third row
+  (check-func-at-point 'moin-command-meta-shift-right multi-column-multi-row-table-string 80 86
+        "Any text before\n|| ab||cd ||  || ef   ||gh||\n||ij|| k ||  ||     lm   ||o||\n||||p ||  || q  ||||\n|| r||stuvw ||  || x   ||||\n|| y||        ||  || z   ||||\n")
+  ;; Insert new column, triggered in fourth column in last row
+  (check-func-at-point 'moin-command-meta-shift-right multi-column-multi-row-table-string 134 150
+       "Any text before\n|| ab||cd || ef   ||  ||gh||\n||ij|| k ||     lm   ||  ||o||\n||||p || q  ||  ||||\n|| r||stuvw || x   ||  ||||\n|| y||        || z   ||  ||||\n"))
+
+
+(ert-deftest test-moin-insert-column-error ()
+  "Tests `moin-command-meta-shift-right' for tables in error cases"
+  ;; Throws error when any other row is malformed (does not have enough columns)
+  (check-func-at-point-throws-error 'moin-command-meta-shift-right
+  		       "|| abc||def || xyz   ||\n|| ||" 13 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-shift-right
+         	       "|| abc||\n|| ||      || gb ||" 16 'user-error))
+  
+
+
 ;; ==================================================
 ;; Testing list functions
 
