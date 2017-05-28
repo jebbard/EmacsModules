@@ -601,7 +601,21 @@ text and table."
   (visual-line-mode 1)
   ;; Setup moin internal data
   (moin--setup-key-bindings)
-  (moin--setup-font-lock))
+  (moin--setup-font-lock)
+
+  ;; Usually we like to avoid "buffer global" variables,
+  ;; but in case of determining if currently in a list,
+  ;; we introduce this one to avoid performance drawbacks,
+  ;; and to still be able to follow the same similar order
+  ;; and function style as for headings and tables.
+  ;; This variable holds the list item info determined during the last
+  ;; call to `moin-is-in-list-p', in case that it was actually
+  ;; called in a list. This variable is not for direct access by the user
+  ;; This variable IS ONLY USED IN COMMANDS and `moin-is-in-list-p'.
+  ;; Other functions must be agnostic of it and receive list item info
+  ;; parameters only instead of accessing this variable.
+  (make-variable-buffer-local 'moin-var-current-list-item-info)
+  (set-default 'moin-var-current-list-item-info nil))
 
 ;; This is the default naming of revision files for moin moin
 ;; wiki articles, when saved in file system

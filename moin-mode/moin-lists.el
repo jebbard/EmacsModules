@@ -26,6 +26,7 @@
 
 ;;; Code
 
+
 ;; ==================================================
 ;; Constants
 
@@ -44,18 +45,10 @@ blank lines or lines with only whitespaces between two list items. Furthermore,
 as soon as there is at least one blank or tab at the beginning of a line, it is 
 considered to belong to a list, if a previous line contains a list. Only lines 
 with a non-whitespace character as first character of the line break the list."
-  (let ((list-regex
-	 "^\\([\t ]+\\)\\([*.]\\|\\([1-9]+\\|[A-Za-z]\\)\\.\\)\\([\t ]*\\)\\([^[:space:]].*?$\\|$\\)"))
-    
-    (save-excursion
-      (beginning-of-line)
-      ;; This match string usually only covers the first line of an item! The sole case
-      ;; where it spans two lines is that after the 
-      (setq )
-      (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not (bobp)))
-	(previous-line)
-	(beginning-of-line))
-      (looking-at list-regex))))
+  (setq moin-var-current-list-item-info (moin--list-get-item-info))
+  (if (eq nil moin-var-current-list-item-info)
+      nil
+    t))
 
 
 ;; ==================================================
@@ -75,19 +68,43 @@ item text starts
 * whitespace-before contains any whitespace before the starting bullet or number
 * starting-bullet contains the text of the starting bullet or number without any 
 whitespace, including a trailing dot for numbers"
-(let (start-pos preamble-end-pos whitespace-before-bullet whitespace-after-bullet starting-bullet)
-  (unless (moin-is-in-list-p)
-    (user-error "Not in list currently"))
+(let (start-pos
+      preamble-end-pos
+      whitespace-before-bullet
+      whitespace-after-bullet
+      starting-bullet
+      really-in-list-p
+      (list-regex
+       "^\\([\t ]+\\)\\([*.]\\|\\([1-9]+\\|[A-Za-z]\\)\\.\\)\\([\t ]*\\)\\([^[:space:]].*?$\\|$\\)"))
+  
+  (save-excursion
+    (beginning-of-line)
+    ;; This match string usually only covers the first line of an item! The sole case
+    ;; where it spans two lines is that after the 
+    (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not (bobp)))
+      (previous-line)
+      (beginning-of-line))
 
-  ;; moin-is-in-list-p stores position of match
-  (setq start-pos (match-beginning 0))
-  (setq preamble-end-pos (match-beginning 5))
+    (setq really-in-list-p (looking-at list-regex))
+    
+    (if really-in-list-p
+	(progn
+	  (setq start-pos (match-beginning 0))
+	  (setq preamble-end-pos (match-beginning 5))
 
-  (setq whitespace-before-bullet (match-string 1))
-  (setq whitespace-after-bullet (match-string 4))
-  (setq starting-bullet (match-string 2))
+	  (setq whitespace-before-bullet (match-string 1))
+	  (setq whitespace-after-bullet (match-string 4))
+	  (setq starting-bullet (match-string 2)))))
 
-  (list start-pos preamble-end-pos whitespace-before-bullet starting-bullet whitespace-after-bullet)))
+    (if really-in-list-p
+	(progn
+	  (save-excursion
+	    ;; TODO
+
+	    )
+	  (list start-pos preamble-end-pos whitespace-before-bullet starting-bullet whitespace-after-bullet))
+      ;; else return nil
+      nil)))
 
 
 (defun moin--list-insert-item-same-level (&optional arg)
