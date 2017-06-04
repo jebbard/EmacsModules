@@ -1562,7 +1562,7 @@ Expectations are given in the list form (current-column (start-point end-point c
   (check-func-at-point 'moin-command-meta-up
   		       " * My item \n * Yours\n" 15 3 " * Yours\n * My item \n")
   (check-func-at-point 'moin-command-meta-up
-		       " * My item \n * Yours\n * third" 15 3 " * Yours\n * My item \n * third")
+  		       " * My item \n * Yours\n * third" 15 3 " * Yours\n * My item \n * third")
   (check-func-at-point 'moin-command-meta-up
   		       "Text before\n * My item \n * Yours\nText behind" 32 20
   		       "Text before\n * Yours\n * My item \nText behind")
@@ -1576,7 +1576,7 @@ Expectations are given in the list form (current-column (start-point end-point c
    		       " * My item \n * Yours\n   \n \n \n" 15 3 " * Yours\n   \n \n \n * My item \n")
   (check-func-at-point 'moin-command-meta-up
   		       "TextBefore\n * My item\n \n * Yours\n\t\n \n \n * third\n \n \n \nTextBehind" 29 16
-		       "TextBefore\n * Yours\n\t\n \n \n * My item\n \n * third\n \n \n \nTextBehind")
+  		       "TextBefore\n * Yours\n\t\n \n \n * My item\n \n * third\n \n \n \nTextBehind")
   ;; Previous item has subitems
   (check-func-at-point 'moin-command-meta-up
   		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 66 5
@@ -1584,5 +1584,5 @@ Expectations are given in the list form (current-column (start-point end-point c
   ;; Current item has subitems
   (check-func-at-point 'moin-command-meta-up
    " * My item\n * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2" 18 7
-  " * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2\n * My item \n")
+  " * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2\n * My item\n")
   )

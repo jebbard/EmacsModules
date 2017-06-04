@@ -276,10 +276,12 @@ Expects to actually be in a list as prerequisite. Never call this
 function if point is currently not in a list."
   (let (current-list-item-info
 	other-list-item-info
+	next-list-item-info
 	current-item-level
 	current-item-start-point
 	current-item-end-point
 	other-item-level
+	next-item-level
 	other-item-start-point
 	current-subtree-end-point
 	current-deletion-end-point
@@ -298,33 +300,34 @@ function if point is currently not in a list."
 
       (while (and other-list-item-info (< current-item-level other-item-level))
 	(setq other-list-item-info (moin--list-previous-item-info other-list-item-info))
-	(setq other-item-level (car (cdr (cdr (cdr other-list-item-info))))))
+        (setq other-item-level (car (cdr (cdr (cdr other-list-item-info))))))
 
       (if (or (not other-list-item-info) (> current-item-level other-item-level))
 	  (user-error "Cannot move item up, it is already the first item")
 	(setq other-item-start-point (car other-list-item-info))))
 
-    (message "C_STRTP %s" current-item-start-point)
-    (message "C_ENDP %s" current-item-end-point)
-    (message "C_STRTP %s" other-item-start-point)
-
     ;; Then we search for the end of the current item's subtree
     (save-excursion
-      (setq other-list-item-info (moin--list-next-item-info current-list-item-info))
-      (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
 
-      (while (and other-list-item-info (< current-item-level other-item-level))
-	(setq other-list-item-info (moin--list-next-item-info other-list-item-info))
-	(setq other-item-level (car (cdr (cdr (cdr other-list-item-info))))))
+      (setq other-list-item-info nil)
+      (setq next-list-item-info current-list-item-info)
 
-      (if (and other-list-item-info (< current-item-level other-item-level))
+      (while (progn
+	       (setq next-list-item-info (moin--list-next-item-info next-list-item-info))
+	       (setq next-item-level (car (cdr (cdr (cdr next-list-item-info)))))
+	       (if (and next-list-item-info (< current-item-level next-item-level))
+		   (progn
+		     (setq other-item-level next-item-level)
+		     (setq other-list-item-info next-list-item-info)
+		     t)
+		 nil)))
+
+      (if other-list-item-info
 	  (setq current-subtree-end-point (car (cdr other-list-item-info)))
 	(progn
-	  (message "HUBAHUBAAA")
 	  (setq current-subtree-end-point (car (cdr current-list-item-info))))))
 
     ;; Perform the "item movement"
-    (message "Current start point %s, current end point %s" current-item-start-point current-subtree-end-point)
     (setq current-item-subtree (buffer-substring current-item-start-point current-subtree-end-point))
 
     (goto-char current-subtree-end-point)
@@ -344,9 +347,7 @@ function if point is currently not in a list."
 
     (insert current-item-subtree)
     (newline)
-    (goto-char (+ other-item-start-point relative-point))
-  ))
-  
+    (goto-char (+ other-item-start-point relative-point))))
 
 
 ;; ==================================================
