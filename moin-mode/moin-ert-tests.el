@@ -45,30 +45,71 @@ sets point to the beginning of the test buffer."
     (funcall action args)))
 
 
-(defun check-func-at-point(func initial-text initial-point expected-point &optional expected-buffer-text region-size args)
+(defun check-func-at-point(func initial-text initial-point expected-point &optional expected-buffer-text region-size args expected-return-value)
   "Inserts the given text into a temporary buffer, then sets point to a specific
 position, optionally selects a region, and finally calls an arbitrary command or
 function with arbitrary arguments. It expects the buffer content to be as given
 by expected-buffer-text - or - if that is nil, the same as the initial-text, and
 the new point at the given expected-point."
-  (with-temp-buffer
-    (moin-mode)
-    (insert initial-text)
-    (goto-char initial-point)
+  (let (actual-return-value)
+    (with-temp-buffer
+      (moin-mode)
+      (insert initial-text)
+      (goto-char initial-point)
 
-    ;; Set the region before executing the func
-    (if region-size
-	(progn
-	  (set-mark-command nil)
-	  (forward-char region-size)))
-    
-    (funcall func args)
+      ;; Set the region before executing the func
+      (if region-size
+	  (progn
+	    (set-mark-command nil)
+	    (forward-char region-size)))
 
-    (if expected-buffer-text
-	(should (equal expected-buffer-text (buffer-string)))
-      (should (equal initial-text (buffer-string))))
-    
-    (should (equal expected-point (point)))))
+      (if args
+	  (setq actual-return-value (funcall func args))
+	(setq actual-return-value (funcall func)))
+
+
+      (if expected-return-value
+	  (should (equal expected-return-value actual-return-value)))
+
+      (if expected-buffer-text
+	  (should (equal expected-buffer-text (buffer-string)))
+	(should (equal initial-text (buffer-string))))
+
+      (if expected-point
+	  (should (equal expected-point (point)))
+	(should (equal initial-point (point)))))))
+
+
+(defun check-read-only-func-at-point(func text initial-point &optional expected-return-value args expected-point region-size)
+  "Inserts the given text into a temporary buffer, then sets point to a specific
+initial-point, optionally selects a region, and finally calls an arbitrary read-only
+function with arbitrary arguments. It expects the buffer content to be unchanged after
+the function invocation and the new point at the given expected-point. Furthermore, it
+checks the function return value against the expected return value."
+  (let (actual-return-value)
+    (with-temp-buffer
+      (moin-mode)
+      (insert text)
+      (goto-char initial-point)
+
+      ;; Set the region before executing the func
+      (if region-size
+	  (progn
+	    (set-mark-command nil)
+	    (forward-char region-size)))
+
+      (if args
+	  (setq actual-return-value (funcall func args))
+	(setq actual-return-value (funcall func)))
+
+      (if expected-return-value
+	  (should (equal expected-return-value actual-return-value)))
+
+      (should (equal text (buffer-string)))
+
+      (if expected-point
+	  (should (equal expected-point (point)))
+	(should (equal initial-point (point)))))))
 
 
 (defun check-func-at-point-throws-error(func initial-text initial-point expected-error-type
@@ -1301,37 +1342,54 @@ Expectations are given in the list form (current-column (start-point end-point c
     (forward-char)))
 
 
-(ert-deftest test-moin--get-list-item-info ()
-  "Tests the behaviour of `moin--list-get-item-info' against a test buffer."
+(ert-deftest test-moin--list-get-item-info ()
+  "Tests `moin--list-get-item-info'"
+  (check-read-only-func-at-point 'moin--list-get-item-info
+    				 " * My item \n * Yours" 15 (list 13 21 16 1 " " "*" " "))
+  (check-read-only-func-at-point 'moin--list-get-item-info
+    				 " * My item \n * Yours\n" 15 (list 13 21 16 1 " " "*" " "))
 
-  (setq expected (list
-		  (list 1 (list 1 4 " " "*" " " 9))
-		  (list 16 (list 10 13 " " "." " " 18))
-		  (list 20 (list 19 21 " " "." "" 21))
-		  (list 37 (list 22 27 "   " "*" " " 37))
-		  (list 39 (list 38 43 "   " "1." "" 45))
-		  (list 58 (list 46 51 "   " "A." "" 76))
-		  (list 67 (list 46 51 "   " "A." "" 76))
-		  (list 73 (list 46 51 "   " "A." "" 76))
-		  (list 76 (list 46 51 "   " "A." "" 76))
-		  (list 107 (list 96 115 "                  " "." "" 115))
-		  (list 124 (list 116 122 "		  " "1." "" 124))
-		  (list 127 (list 125 129 " " "22." "" 131))
-		  (list 132 (list 132 135 " " "o." "" 152))
-		  (list 133 (list 132 135 " " "o." "" 152))
-		  (list 136 (list 132 135 " " "o." "" 152))
-		  (list 138 (list 132 135 " " "o." "" 152))
-		  (list 139 (list 132 135 " " "o." "" 152))
-		  (list 145 (list 132 135 " " "o." "" 152))
-		  (list 152 (list 132 135 " " "o." "" 152))))
+  (setq test-buffer-text " * asdas\n . asdsa\n .\n   * next level\n   1.ha\n   A.\n df\n sds\n   \n	\n	\n\n   \n\n\n\n   q.\n   i.\n\n   I.\n                  .\n		  1.\n\n\n 22.\n \n o.\n  \n\n looney item\n")
   
-  (test-moin--execute-on-file "auto_test_lists.txt" 'test-moin--check-list-get-item-info expected))
-
-
-(defun test-moin--check-list-get-item-info(expected)
-  (dolist (current-item expected)
-    (goto-char (car current-item))
-    (should (equal (car (cdr current-item)) (moin--list-get-item-info)))))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 1 (list 1 9 4 1 " " "*" " "))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 16 (list 10 18 13 1 " " "." " "))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 20 (list 19 21 21 1 " " "." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 37 (list 22 37 27 3 "   " "*" " "))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 39 (list 38 45 43 3 "   " "1." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 58 (list 46 76 51 3 "   " "A." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 67 (list 46 76 51 3 "   " "A." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 73 (list 46 76 51 3 "   " "A." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 76 (list 46 76 51 3 "   " "A." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 107 (list 96 115 115 18 "                  " "." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 124 (list 116 124 122 4 "		  " "1." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 127 (list 125 131 129 1 " " "22." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 132 (list 132 152 135 1 " " "o." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 133 (list 132 152 135 1 " " "o." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 136 (list 132 152 135 1 " " "o." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 138 (list 132 152 135 1 " " "o." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 139 (list 132 152 135 1 " " "o." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 145 (list 132 152 135 1 " " "o." ""))
+  (check-read-only-func-at-point 'moin--list-get-item-info test-buffer-text
+  				 152 (list 132 152 135 1 " " "o." "")))
+ 
 
 
 (ert-deftest test-moin--get-list-item-info-error ()
@@ -1493,3 +1551,38 @@ Expectations are given in the list form (current-column (start-point end-point c
     
     ;; Check text of first list item
     (should (equal (substring text-before (- split-at-point 1)) (buffer-substring-no-properties (point) (+ 1 (point) (- (length text-before) split-at-point)))))))
+
+
+(ert-deftest test--moin-list-move-subtree-up ()
+  "Tests `moin-command-meta-up' for lists"
+
+  ;; Items without subitems, without multiline items
+  (check-func-at-point 'moin-command-meta-up
+  		       " * My item \n * Yours" 15 3 " * Yours\n * My item \n")
+  (check-func-at-point 'moin-command-meta-up
+  		       " * My item \n * Yours\n" 15 3 " * Yours\n * My item \n")
+  (check-func-at-point 'moin-command-meta-up
+		       " * My item \n * Yours\n * third" 15 3 " * Yours\n * My item \n * third")
+  (check-func-at-point 'moin-command-meta-up
+  		       "Text before\n * My item \n * Yours\nText behind" 32 20
+  		       "Text before\n * Yours\n * My item \nText behind")
+  (check-func-at-point 'moin-command-meta-up
+  		       " * First item\n * My item \n * Yours\nText behind" 29 17
+  		       " * First item\n * Yours\n * My item \nText behind")
+  ;; Items without subitems, with multiline items
+  (check-func-at-point 'moin-command-meta-up
+  		       " * My item\n \n * Yours" 15 2 " * Yours\n * My item\n \n")
+  (check-func-at-point 'moin-command-meta-up
+   		       " * My item \n * Yours\n   \n \n \n" 15 3 " * Yours\n   \n \n \n * My item \n")
+  (check-func-at-point 'moin-command-meta-up
+  		       "TextBefore\n * My item\n \n * Yours\n\t\n \n \n * third\n \n \n \nTextBehind" 29 16
+		       "TextBefore\n * Yours\n\t\n \n \n * My item\n \n * third\n \n \n \nTextBehind")
+  ;; Previous item has subitems
+  (check-func-at-point 'moin-command-meta-up
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 66 5
+  		       " * Yours\n * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n")
+  ;; Current item has subitems
+  (check-func-at-point 'moin-command-meta-up
+   " * My item\n * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2" 18 7
+  " * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2\n * My item \n")
+  )

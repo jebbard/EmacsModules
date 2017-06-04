@@ -240,7 +240,7 @@ item below its parent item."
   (if (moin-is-in-table-p)
       (moin--table-remove-row arg)
     (if (moin-is-in-list-p)
-	(moin--list-move-subtree-up -1)
+	(moin--list-move-subtree-up arg)
       (if (moin-is-on-heading-p)
 	  (moin--heading-move-subtree-up-or-down -1)))))
 
@@ -262,7 +262,7 @@ item below its parent item."
   (if (moin-is-in-table-p)
       (moin--table-insert-row t)
     (if (moin-is-in-list-p)
-	(moin--list-move-subtree-down 1)
+	(moin--list-move-subtree-down arg)
       (if (moin-is-on-heading-p)
 	  (moin--heading-move-subtree-up-or-down 1)))))
 
@@ -280,7 +280,7 @@ with previous row), if it is not already the first row in the table."
   (if (moin-is-in-table-p)
       (moin--table-move-row-up arg)
     (if (moin-is-in-list-p)
-	(moin--list-move-subtree-down -1)
+	(moin--list-move-subtree-up arg)
       (if (moin-is-on-heading-p)
 	  (moin--heading-move-subtree-up-or-down -1)))))
 
@@ -298,7 +298,7 @@ with next row), if it is not already the last row in the table."
   (if (moin-is-in-table-p)
       (moin--table-move-row-down arg)
     (if (moin-is-in-list-p)
-	(moin--list-move-subtree-down 1)
+	(moin--list-move-subtree-down arg)
       (if (moin-is-on-heading-p)
 	  (moin--heading-move-subtree-up-or-down 1)))))
 

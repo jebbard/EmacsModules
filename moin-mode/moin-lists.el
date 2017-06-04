@@ -68,25 +68,30 @@ the case. An item info always only refers to the current item and does not care
 whether this item is part of the subtree of another item, or it has a subtree itself.
 
 The returned information is: 
-(start-pos preamble-end-pos whitespace-before starting-bullet end-pos), where
-* start-pos is the start point of the item, i.e. the beginning of the line 
+(start-point end-point preamble-end-point level whitespace-before-bullet starting-bullet whitespace-after-bullet), where
+* start-point is the start point of the item, i.e. the beginning of the line 
 where the starting bullet or number of the list is located on
-* preamble-end-pos is the end point of the preamble, i.e. the text including 
-whitespace, starting bullet or number and any further whitspace before the actual 
-item text starts
-* whitespace-before contains any whitespace before the starting bullet or number
-* starting-bullet contains the text of the starting bullet or number without any 
-whitespace, including a trailing dot for numbers
-* end-pos is the end point of the item, i.e. the point after the last character
+* end-point is the end point of the item, i.e. the point after the last character
 (excluding last newline) of the item; this IS NOT the point after the last subtree
 item of the current item, i.e. if the current item has sub-items, it is the point
-at eol before the first subitem."
-(let (start-pos
-      preamble-end-pos
+at eol before the first subitem.
+* preamble-end-point is the end point of the preamble, i.e. the text including 
+whitespace, starting bullet or number and any further whitspace before the actual 
+item text starts
+* level is an integer specifying the level this item is on, basically the number of
+whitespace characters in front o the starting-bullet
+* whitespace-before-bullet contains any whitespace before the starting bullet or number
+* starting-bullet contains the text of the starting bullet or number without any 
+whitespace, including a trailing dot for numbers
+* whitespace-after-bullet contains any whitespace after the starting bullet or number and
+before the first text character of the item"
+(let (start-point
+      end-point
+      preamble-end-point
+      level
       whitespace-before-bullet
       whitespace-after-bullet
       starting-bullet
-      end-pos
       really-in-list-p
       eob-p
       (list-regex
@@ -103,8 +108,8 @@ at eol before the first subitem."
     
     (if really-in-list-p
 	(progn
-	  (setq start-pos (match-beginning 0))
-	  (setq preamble-end-pos (match-beginning 5))
+	  (setq start-point (match-beginning 0))
+	  (setq preamble-end-point (match-beginning 5))
 
 	  (setq whitespace-before-bullet (match-string 1))
 	  (setq whitespace-after-bullet (match-string 4))
@@ -128,7 +133,8 @@ at eol before the first subitem."
 			(setq eob-p t)
 		      (progn
 			(next-line)
-			(beginning-of-line))))))
+			(beginning-of-line)))))
+	      (setq eob-p t))
 
 	    (if (not eob-p)
 		(progn
@@ -138,10 +144,10 @@ at eol before the first subitem."
 			(previous-line)
 			(end-of-line)))))
 	    
-	    (setq end-pos (point)))
+	    (setq end-point (point)))
 	  
-	  (list start-pos preamble-end-pos whitespace-before-bullet starting-bullet
-		whitespace-after-bullet end-pos))
+	  (list start-point end-point preamble-end-point (length whitespace-before-bullet)
+		whitespace-before-bullet starting-bullet whitespace-after-bullet))
       ;; else return nil
       nil)))
 
@@ -163,10 +169,10 @@ function if point is currently not in a list."
       (user-error "Not in list currently"))
 
     (setq item-start-pos (car item-info))
-    (setq item-preamble-end-pos (car (cdr item-info)))
-    (setq item-whitespace-before (car (cdr (cdr item-info))))
-    (setq item-starting-bullet (car (cdr (cdr (cdr item-info)))))
-    (setq item-whitespace-after (car (cdr (cdr (cdr (cdr item-info))))))
+    (setq item-preamble-end-pos (car (cdr (cdr item-info))))
+    (setq item-whitespace-before (car (cdr (cdr (cdr (cdr item-info))))))
+    (setq item-starting-bullet (car (cdr (cdr (cdr (cdr (cdr item-info)))))))
+    (setq item-whitespace-after (car (cdr (cdr (cdr (cdr (cdr (cdr item-info))))))))
 
     (if (>= item-preamble-end-pos (point))
 	;; Item text starts after point -> Insert new item in front of current
@@ -221,6 +227,42 @@ function if point is currently not in a list."
   (user-error "Not implemented yet for lists!"))
 
 
+(defun moin--list-previous-item-info(current-item-info)
+  "Determines the list item info of the previous list item, if any, 
+and returns it. If there is no previous item, returns nil. See 
+`moin--list-get-item-info' for details about the returned data
+structure."
+  (let (current-start-point)
+
+    (setq current-start-point (car current-item-info))
+
+    (goto-char current-start-point)
+
+    (if (bobp)
+	nil
+      (progn
+	(previous-line)
+	(moin--list-get-item-info)))))
+
+
+(defun moin--list-next-item-info(current-item-info)
+  "Determines the list item info of the next list item, if any, 
+and returns it. If there is no next item, returns nil. See 
+`moin--list-get-item-info' for details about the returned data
+structure."
+  (let (current-end-point)
+
+    (setq current-end-point (car (cdr current-item-info)))
+
+    (goto-char current-end-point)
+
+    (if (eobp)
+	nil
+      (progn
+	(next-line)
+	(moin--list-get-item-info)))))
+
+
 (defun moin--list-move-subtree-down (&optional arg)
   "See `moin-command-meta-shift-down' for more information.
 Expects to actually be in a list as prerequisite. Never call this 
@@ -232,7 +274,79 @@ function if point is currently not in a list."
   "See `moin-command-meta-shift-up' for more information.
 Expects to actually be in a list as prerequisite. Never call this 
 function if point is currently not in a list."
-  (user-error "Not implemented yet for lists!"))
+  (let (current-list-item-info
+	other-list-item-info
+	current-item-level
+	current-item-start-point
+	current-item-end-point
+	other-item-level
+	other-item-start-point
+	current-subtree-end-point
+	current-deletion-end-point
+	relative-point)
+
+    (setq current-list-item-info (moin--list-get-item-info))
+    (setq current-item-start-point (car current-list-item-info))
+    (setq current-item-end-point (car (cdr current-list-item-info)))
+    (setq current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
+    (setq relative-point (- (point) current-item-start-point))
+    
+    ;; First we search for the previous item on same level, if any
+    (save-excursion
+      (setq other-list-item-info (moin--list-previous-item-info current-list-item-info))
+      (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
+
+      (while (and other-list-item-info (< current-item-level other-item-level))
+	(setq other-list-item-info (moin--list-previous-item-info other-list-item-info))
+	(setq other-item-level (car (cdr (cdr (cdr other-list-item-info))))))
+
+      (if (or (not other-list-item-info) (> current-item-level other-item-level))
+	  (user-error "Cannot move item up, it is already the first item")
+	(setq other-item-start-point (car other-list-item-info))))
+
+    (message "C_STRTP %s" current-item-start-point)
+    (message "C_ENDP %s" current-item-end-point)
+    (message "C_STRTP %s" other-item-start-point)
+
+    ;; Then we search for the end of the current item's subtree
+    (save-excursion
+      (setq other-list-item-info (moin--list-next-item-info current-list-item-info))
+      (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
+
+      (while (and other-list-item-info (< current-item-level other-item-level))
+	(setq other-list-item-info (moin--list-next-item-info other-list-item-info))
+	(setq other-item-level (car (cdr (cdr (cdr other-list-item-info))))))
+
+      (if (and other-list-item-info (< current-item-level other-item-level))
+	  (setq current-subtree-end-point (car (cdr other-list-item-info)))
+	(progn
+	  (message "HUBAHUBAAA")
+	  (setq current-subtree-end-point (car (cdr current-list-item-info))))))
+
+    ;; Perform the "item movement"
+    (message "Current start point %s, current end point %s" current-item-start-point current-subtree-end-point)
+    (setq current-item-subtree (buffer-substring current-item-start-point current-subtree-end-point))
+
+    (goto-char current-subtree-end-point)
+    
+    (if (not (eobp))
+	(progn
+	  (next-line)
+	  (beginning-of-line)
+	  (setq current-deletion-end-point (point)))
+      (setq current-deletion-end-point current-subtree-end-point))
+    
+    (goto-char current-item-start-point)
+
+    (delete-forward-char (- current-deletion-end-point current-item-start-point))
+
+    (goto-char other-item-start-point)
+
+    (insert current-item-subtree)
+    (newline)
+    (goto-char (+ other-item-start-point relative-point))
+  ))
+  
 
 
 ;; ==================================================
