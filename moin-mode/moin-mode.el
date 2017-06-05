@@ -316,9 +316,11 @@ table. Point is placed at the beginning of the next column, if any. If there
 is no next column, it is placed at the beginning of the previous column, if
 any.
 * If point is currently in a list, it decreases the indentation of the
-current item with its subtree (i.e. all its children). A subtree's indentation
-can only be decreased if it is not already on the left-most indentation level of 
-the list."
+current item with its subtree (i.e. all its children) by just removing one
+blank. A subtree's indentation can only be decreased if it is not already on
+the left-most indentation level of the list. If any item in the current 
+subtree spans over multiple lines, one blank is removed from each line,
+unless there is just a single blank left which is always kept."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-remove-column arg)
@@ -340,8 +342,10 @@ of the heading, if necessary.
 left of the current column. Point is places within the same row and the 
 beginning of the new column.
 * If point is currently in a list, it increases the indentation of the
-current item with its subtree (i.e. all its children). An item's indentation
-can only be increased if it is not the first item below its parent."
+current item with its subtree (i.e. all its children) by just adding one
+blank. An item's indentation can only be increased if it is not the first
+item below its parent. If any item in the current subtree item spans over
+multiple lines, one blank is added at the beginning of each line."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-insert-column arg)
@@ -362,10 +366,13 @@ message. It also fixes errors in the end marker of the heading, if necessary.
 table to the left, but only if it is not already the left-most column. Point is 
 set to be at the start of the column directly behind the column delimiter after
 movement.
-* If point is currently in a list, it decreases the indentation, leaving its
-children unchanged. A single item's indentation can only be decreased if it is
-not already on the left-most indentation level of the list. Furthermore, if the
-item has children, its indentation can only be decreased by one."
+* If point is currently in a list, it decreases the indentation by just removing one
+blank, leaving its children unchanged. A single item's indentation can only be
+decreased if it is not already on the left-most indentation level of the list.
+Furthermore, if the item has children, its indentation cannot be decreased. Use 
+`moin-command-meta-shift-left' in this case instead. If the item spans over multiple
+lines, one blank is removed from each line, unless there is just a single blank left
+which is always kept."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-move-column-left arg)
@@ -384,9 +391,10 @@ This command does not work with an active mark, which will lead to an error
 message. It also fixes errors in the end marker of the heading, if necessary.
 * If point is currently in a table, it moves the current column of the
 table to the right, but only if it is not already the right-most column.
-* If point is currently in a list, it increases the indentation, leaving its
-children unchanged. An item's indentation can only be increased if it is not the
-first item below its parent."
+* If point is currently in a list, it increases the indentation by just adding
+one blank, leaving its children unchanged. An item's indentation can only be
+increased if it is not the first item below its parent. If the item spans over
+multiple lines, one blank is added at the beginning of each line."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-move-column-right arg)

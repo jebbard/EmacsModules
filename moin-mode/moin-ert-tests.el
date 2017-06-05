@@ -1690,3 +1690,42 @@ Expectations are given in the list form (current-column (start-point end-point c
   (check-func-at-point-throws-error func
   				    " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 68  'user-error))
 
+
+(ert-deftest test--moin-list-indent-item ()
+  "Tests `moin-command-meta-right' for lists"
+  
+  ;; Items without subitems, without multiline items
+  (check-func-at-point 'moin-command-meta-right
+  		       " * My item \n * Yours" 17 18 " * My item \n  * Yours")
+  (check-func-at-point 'moin-command-meta-right
+  		       " * My item \n * Yours\n" 17 18 " * My item \n  * Yours\n")
+  (check-func-at-point 'moin-command-meta-right
+  		       " * My item \n * Yours\n * third" 17 18 " * My item \n  * Yours\n * third")
+  (check-func-at-point 'moin-command-meta-right
+  		       "Text before\n * My item \n * Yours\nText behind" 26 27
+  		       "Text before\n * My item \n  * Yours\nText behind")
+  ;; Indent multiline items
+  (check-func-at-point 'moin-command-meta-right
+       " * My item\n * Yours\n   \n \n \n * third" 19 20 " * My item\n  * Yours\n    \n  \n  \n * third")
+  (check-func-at-point 'moin-command-meta-right
+  " * My item\n * Yours\n   \n \n \n\t\n   \n * third" 19 20 " * My item\n  * Yours\n    \n  \n  \n \t\n    \n * third")
+  (check-func-at-point 'moin-command-meta-right
+		       "TextBefore\n * My item\n * Yours\n   \n \n \n\t\n   \nText behind" 30 31 "TextBefore\n * My item\n  * Yours\n    \n  \n  \n \t\n    \nText behind")
+  ;; Indent subitems
+  (check-func-at-point 'moin-command-meta-right
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 35 36
+  		       " * My item \n   * Subitem 1\n    * Subitem 2\n     * Subitem 2.1\n * Yours")
+  ;; Indent items after previous higher level items
+  (check-func-at-point 'moin-command-meta-right
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 70 71
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n  * Yours"))
+
+
+(ert-deftest test--moin-list-indent-item-error ()
+  "Tests `moin-command-meta-right' for lists in negative cases"
+  
+  (check-func-at-point-throws-error 'moin-command-meta-right
+  		       " * My item" 9 'user-error)
+  (check-func-at-point-throws-error 'moin-command-meta-right
+  		       " * My item\n  * My Subitem" 16 'user-error))
+  
