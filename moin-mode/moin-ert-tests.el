@@ -1555,34 +1555,68 @@ Expectations are given in the list form (current-column (start-point end-point c
 
 (ert-deftest test--moin-list-move-subtree-up ()
   "Tests `moin-command-meta-up' for lists"
+  (test--check-moin-list-move-subtree-up 'moin-command-meta-up))
+
+(ert-deftest test--moin-list-move-subtree-up-shift ()
+  "Tests `moin-command-meta-shift-up' for lists"
+  (test--check-moin-list-move-subtree-up 'moin-command-meta-shift-up))
+
+
+(defun test--check-moin-list-move-subtree-up (func)
+  "Tests `moin-command-meta-up' for lists"
 
   ;; Items without subitems, without multiline items
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       " * My item \n * Yours" 15 3 " * Yours\n * My item \n")
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       " * My item \n * Yours\n" 15 3 " * Yours\n * My item \n")
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       " * My item \n * Yours\n * third" 15 3 " * Yours\n * My item \n * third")
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       "Text before\n * My item \n * Yours\nText behind" 32 20
   		       "Text before\n * Yours\n * My item \nText behind")
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       " * First item\n * My item \n * Yours\nText behind" 29 17
   		       " * First item\n * Yours\n * My item \nText behind")
   ;; Items without subitems, with multiline items
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       " * My item\n \n * Yours" 15 2 " * Yours\n * My item\n \n")
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
    		       " * My item \n * Yours\n   \n \n \n" 15 3 " * Yours\n   \n \n \n * My item \n")
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       "TextBefore\n * My item\n \n * Yours\n\t\n \n \n * third\n \n \n \nTextBehind" 29 16
   		       "TextBefore\n * Yours\n\t\n \n \n * My item\n \n * third\n \n \n \nTextBehind")
   ;; Previous item has subitems
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
   		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 66 5
   		       " * Yours\n * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n")
   ;; Current item has subitems
-  (check-func-at-point 'moin-command-meta-up
+  (check-func-at-point func
    " * My item\n * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2" 18 7
-  " * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2\n * My item\n")
-  )
+   " * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2\n * My item\n")
+  ;; Most complex mixture of all cases
+  (check-func-at-point func
+		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * Third item\n   * Text\n\n Any Text behind" 165 52
+		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Third item\n   * Text\n\n Any Text behind"))
+
+
+(ert-deftest test--moin-list-move-subtree-up-error ()
+  "Tests `moin-command-meta-up' for lists in negative cases"
+  (test--check-moin-list-move-subtree-up-error 'moin-command-meta-up))
+
+
+(ert-deftest test--moin-list-move-subtree-up-shift-error ()
+  "Tests `moin-command-meta-shift-up' for lists in negative cases"
+  (test--check-moin-list-move-subtree-up-error 'moin-command-meta-shift-up))
+
+
+(defun test--check-moin-list-move-subtree-up-error (func)
+  "Tests `moin-command-meta-up' for lists in negative cases"
+  (check-func-at-point-throws-error func
+  		       " * My item \n * Yours" 5 'user-error)
+  (check-func-at-point-throws-error func
+  		       "Text before\n * My item \n * Yours\nText behind" 24 'user-error)
+  (check-func-at-point-throws-error func
+   " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 24  'user-error)
+  (check-func-at-point-throws-error func
+   " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 68  'user-error))

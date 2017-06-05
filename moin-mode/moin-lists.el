@@ -88,15 +88,15 @@ before the first text character of the item"
 (let (start-point
       end-point
       preamble-end-point
-      level
       whitespace-before-bullet
       whitespace-after-bullet
       starting-bullet
       really-in-list-p
-      eob-p
       (list-regex
        "^\\([\t ]+\\)\\([*.]\\|\\([1-9]+\\|[A-Za-z]\\)\\.\\)\\([\t ]*\\)\\([^[:space:]].*?$\\|$\\)"))
-  
+
+  ;; First search for the starting bullet of the current item, if any - it can be on any line above
+  ;; current point
   (save-excursion
     (beginning-of-line)
     
@@ -115,41 +115,28 @@ before the first text character of the item"
 	  (setq whitespace-after-bullet (match-string 4))
 	  (setq starting-bullet (match-string 2)))))
 
-    (if really-in-list-p
-	(progn
-	  (save-excursion
-
-	    (setq eob-p nil)
-	    (end-of-line)
-
-	    (if (not (eobp))
-		(progn
-		  (next-line)
-		  (beginning-of-line)
-		  
-		  (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not eob-p))
-		    (end-of-line)
-		    (if (eobp)
-			(setq eob-p t)
-		      (progn
-			(next-line)
-			(beginning-of-line)))))
-	      (setq eob-p t))
-
-	    (if (not eob-p)
-		(progn
-		  (beginning-of-line)
-		  (if (not (bobp))
-		      (progn
-			(previous-line)
-			(end-of-line)))))
-	    
-	    (setq end-point (point)))
-	  
-	  (list start-point end-point preamble-end-point (length whitespace-before-bullet)
-		whitespace-before-bullet starting-bullet whitespace-after-bullet))
-      ;; else return nil
-      nil)))
+  ;; Then search for the end point of the current item (NOT the items subtree!) - it can be
+  ;; on any line below current point
+  (if really-in-list-p
+      (progn
+	(save-excursion
+	  ;; This while loop loops over the next lines as long as line end is not the end of buffer
+	  ;; and the line starts with a specific pattern which is not a new item pattern
+	  ;; The goal is to determine the correct end-point of the item
+	  (while (progn
+		   (end-of-line)
+		   (setq end-point (point))
+		   (if (eobp)
+			 nil
+		     (progn
+		       (next-line)
+		       (beginning-of-line)
+		       (and (looking-at "^\\s-") (not (looking-at list-regex))))))))
+	
+	(list start-point end-point preamble-end-point (length whitespace-before-bullet)
+	      whitespace-before-bullet starting-bullet whitespace-after-bullet))
+    ;; else return nil
+    nil)))
 
 
 (defun moin--list-insert-item-same-level (&optional arg)
@@ -269,6 +256,62 @@ Expects to actually be in a list as prerequisite. Never call this
 function if point is currently not in a list."
   (user-error "Not implemented yet for lists!"))
 
+(defun moin--list-get-sibling-item-info(current-list-item-info move-func)
+  "This function returns the list item info structure - see 
+`moin--list-get-item-info' for how it is defined - of a sibling list item based 
+on the given current-list-item-info, ideally with the same level, depending on
+move-func.
+There are following cases:
+* move-func = `moin--list-next-item-info': This function searches the next list
+item below the current item, preferably with the same level as the current item.
+If the current item is the very last item in the list without any subitems, its 
+item info itself is returned. If the current item subtree is the last subtree in
+the list, the info of its last subtree item is returned. If there is a next item
+with smaller level only, this item's info is returned.
+* move-func = `moin--list-previous-item-info': This function searches the
+previous list item above the current item, preferably with the same level as the
+current item. If the current item is the first item in the list, its item info
+itself is returned. If the current item is not the first item in the list, it
+returns the item info of the nearest previous item with the same or a smaller
+level. If there is no such item, and still the current item is not the very first
+item in the list, the list is actually malformed, but this function simply returns
+the item info of the last item it can find.
+
+Thus, to e.g. determine if there really is a previous item with the same level,
+callers need to check the start point as well as the level of the returned item info."
+  (let (returned-list-item-info
+	other-list-item-info
+	current-item-level
+	other-item-level)
+
+    (setq other-list-item-info current-list-item-info)
+    (setq returned-list-item-info current-list-item-info)
+    (setq current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
+    
+    (save-excursion
+      (while (progn
+	       (setq other-list-item-info (funcall move-func other-list-item-info))
+	       (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
+	       (if other-list-item-info
+		   (setq returned-list-item-info other-list-item-info))
+	       
+	       (and other-list-item-info (not (eq current-item-level other-item-level))))))
+
+    returned-list-item-info))
+
+
+
+(defun moin--list-point-at-beginning-of-next-line-or-eol(current-point)
+  "Starting from the current point, returns the point on the start of the next line, or 
+if there is no next line, the point at end of line."
+  (save-excursion
+    (goto-char current-point)
+    (if (eobp)
+	(point-at-eol)
+      (progn
+	(next-line)
+	(point-at-bol)))))
+
 
 (defun moin--list-move-subtree-up (&optional arg)
   "See `moin-command-meta-shift-up' for more information.
@@ -276,15 +319,12 @@ Expects to actually be in a list as prerequisite. Never call this
 function if point is currently not in a list."
   (let (current-list-item-info
 	other-list-item-info
-	next-list-item-info
 	current-item-level
 	current-item-start-point
 	current-item-end-point
 	other-item-level
-	next-item-level
 	other-item-start-point
 	current-subtree-end-point
-	current-deletion-end-point
 	relative-point)
 
     (setq current-list-item-info (moin--list-get-item-info))
@@ -292,61 +332,55 @@ function if point is currently not in a list."
     (setq current-item-end-point (car (cdr current-list-item-info)))
     (setq current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
     (setq relative-point (- (point) current-item-start-point))
+
+    ;; Search for the end of the current item's subtree
+    (setq other-list-item-info
+	  (moin--list-get-sibling-item-info current-list-item-info 'moin--list-next-item-info))
     
-    ;; First we search for the previous item on same level, if any
-    (save-excursion
-      (setq other-list-item-info (moin--list-previous-item-info current-list-item-info))
-      (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
+    (setq other-item-start-point (car other-list-item-info))
+    (setq other-item-end-point (car (cdr other-list-item-info)))
+    (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
 
-      (while (and other-list-item-info (< current-item-level other-item-level))
-	(setq other-list-item-info (moin--list-previous-item-info other-list-item-info))
-        (setq other-item-level (car (cdr (cdr (cdr other-list-item-info))))))
+    ;; Determine the end point of the current subtree (after trailing line break, if any, i.e. on
+    ;; the next line behind the last item's end point)
+    (cond
+     ;; The current item has no subtree
+     ((eq other-item-start-point current-item-start-point) 
+      (setq current-subtree-end-point
+	    (moin--list-point-at-beginning-of-next-line-or-eol current-item-end-point)))
+     ;; The list ends with a subtree item of the current item
+     ((> other-item-level current-item-level) 
+      (setq current-subtree-end-point
+	    (moin--list-point-at-beginning-of-next-line-or-eol other-item-end-point)))
+     ;; The subtree is followed up by a sibling list item on the
+     ;; same or smaller level than the current item's level
+     ((<= other-item-level current-item-level)
+      (setq current-subtree-end-point other-item-start-point)))
+    
+    ;; Search for the previous item on same level, if any
+    (setq other-list-item-info
+	  (moin--list-get-sibling-item-info current-list-item-info 'moin--list-previous-item-info))
 
-      (if (or (not other-list-item-info) (> current-item-level other-item-level))
-	  (user-error "Cannot move item up, it is already the first item")
-	(setq other-item-start-point (car other-list-item-info))))
+    (setq other-item-start-point (car other-list-item-info))
+    (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
 
-    ;; Then we search for the end of the current item's subtree
-    (save-excursion
-
-      (setq other-list-item-info nil)
-      (setq next-list-item-info current-list-item-info)
-
-      (while (progn
-	       (setq next-list-item-info (moin--list-next-item-info next-list-item-info))
-	       (setq next-item-level (car (cdr (cdr (cdr next-list-item-info)))))
-	       (if (and next-list-item-info (< current-item-level next-item-level))
-		   (progn
-		     (setq other-item-level next-item-level)
-		     (setq other-list-item-info next-list-item-info)
-		     t)
-		 nil)))
-
-      (if other-list-item-info
-	  (setq current-subtree-end-point (car (cdr other-list-item-info)))
-	(progn
-	  (setq current-subtree-end-point (car (cdr current-list-item-info))))))
-
+    ;; There is no previous item on the same level
+    (if (or (eq other-item-start-point current-item-start-point)
+	    (not (eq other-item-level current-item-level)))
+	(user-error "Cannot move item up, it is already the first item in the subtree with the same level"))
+    
     ;; Perform the "item movement"
     (setq current-item-subtree (buffer-substring current-item-start-point current-subtree-end-point))
 
-    (goto-char current-subtree-end-point)
-    
-    (if (not (eobp))
-	(progn
-	  (next-line)
-	  (beginning-of-line)
-	  (setq current-deletion-end-point (point)))
-      (setq current-deletion-end-point current-subtree-end-point))
-    
     (goto-char current-item-start-point)
 
-    (delete-forward-char (- current-deletion-end-point current-item-start-point))
+    (delete-forward-char (- current-subtree-end-point current-item-start-point))
 
     (goto-char other-item-start-point)
 
     (insert current-item-subtree)
-    (newline)
+    (if (not (eq (point) (point-at-bol)))
+	(newline))
     (goto-char (+ other-item-start-point relative-point))))
 
 
