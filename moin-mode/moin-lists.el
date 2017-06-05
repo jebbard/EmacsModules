@@ -210,9 +210,6 @@ function if point is currently not in a list."
 
     (if (or (not previous-list-item-info) (< previous-item-level current-item-level))
 	(user-error "Cannot indent first item of a list"))
-
-    (message "CUrr it start %s " current-item-start-point)
-    (message "CUrr it END %s " current-item-end-point)
     
     (goto-char current-item-start-point)
 
@@ -224,18 +221,54 @@ function if point is currently not in a list."
       (setq blanks-added-so-far (+ 1 blanks-added-so-far))
       (end-of-line)
       (if (not (eobp))
-	  (next-line))
-      )
+	  (next-line)))
 
-    (goto-char (+ 1 current-point))
-  ))
+    (goto-char (+ current-point 1))))
 
 
 (defun moin--list-outdent-item (&optional arg)
-  "See `moin-command-meta-right' for more information.
+  "See `moin-command-meta-left' for more information.
 Expects to actually be in a list as prerequisite. Never call this 
 function if point is currently not in a list."
-  (user-error "Not implemented yet for lists!"))
+  (let (current-list-item-info
+	current-item-start-point
+	current-item-end-point
+	current-item-level
+	previous-list-item-info
+	previous-item-level
+	current-point)
+
+    (setq current-point (point))
+    
+    (setq current-list-item-info (moin--list-get-item-info))
+    (setq current-item-start-point (car current-list-item-info))
+    (setq current-item-end-point (car (cdr current-list-item-info)))
+    (setq current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
+
+    (setq previous-list-item-info (moin--list-next-item-info current-list-item-info))
+    (setq previous-item-level (car (cdr (cdr (cdr previous-list-item-info)))))
+
+    (if (eq current-item-level 1)
+	(user-error "Cannot outdent top-level items"))
+    
+    (if (and previous-list-item-info (> previous-item-level current-item-level))
+     	(user-error "Cannot outdent an item without its children"))
+    
+    (goto-char current-item-start-point)
+
+    (setq blanks-added-so-far 0)
+    
+    (while (and (<= (point) (+ blanks-added-so-far current-item-end-point)) (not (eobp)))
+      (beginning-of-line)
+      (if (looking-at "[ \t][ \t]")
+	  (delete-char 1))
+      
+      (setq blanks-added-so-far (+ 1 blanks-added-so-far))
+      (end-of-line)
+      (if (not (eobp))
+	  (next-line)))
+
+    (goto-char (- current-point 1))))
 
 
 (defun moin--list-indent-subtree (&optional arg)
