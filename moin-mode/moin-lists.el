@@ -250,12 +250,6 @@ structure."
 	(moin--list-get-item-info)))))
 
 
-(defun moin--list-move-subtree-down (&optional arg)
-  "See `moin-command-meta-shift-down' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
-  (user-error "Not implemented yet for lists!"))
-
 (defun moin--list-get-sibling-item-info(current-list-item-info move-func)
   "This function returns the list item info structure - see 
 `moin--list-get-item-info' for how it is defined - of a sibling list item based 
@@ -313,61 +307,77 @@ if there is no next line, the point at end of line."
 	(point-at-bol)))))
 
 
+(defun moin--list-get-subtree-end-point (list-item-info)
+  "Determin the end-point of the subtree of the given list-item-info, i.e.
+the point where the last child subitem of the given item ends. Even that is
+not fully correct - we return the point on the beginning of the next line 
+after the last child, if there is a next line, otherwise the point at eol."
+  (let (next-list-item-info
+	subtree-end-point)
+    
+    (setq item-start-point (car list-item-info))
+    (setq item-end-point (car (cdr list-item-info)))
+    (setq item-level (car (cdr (cdr (cdr list-item-info)))))
+
+    ;; Search for the end of the current item's subtree
+    (setq next-list-item-info
+	  (moin--list-get-sibling-item-info list-item-info 'moin--list-next-item-info))
+    
+    (setq next-item-start-point (car next-list-item-info))
+    (setq next-item-end-point (car (cdr next-list-item-info)))
+    (setq next-item-level (car (cdr (cdr (cdr next-list-item-info)))))
+
+    ;; Determine the end point of the subtree (after trailing line break, if any, i.e. on
+    ;; the next line behind the last subitem's end point)
+    (cond
+     ;; The current item has no subtree
+     ((eq next-item-start-point item-start-point) 
+      (setq subtree-end-point
+	    (moin--list-point-at-beginning-of-next-line-or-eol item-end-point)))
+     ;; The list ends with a subtree item of the current item
+     ((> next-item-level item-level) 
+      (setq subtree-end-point
+	    (moin--list-point-at-beginning-of-next-line-or-eol next-item-end-point)))
+     ;; The subtree is followed up by a sibling list item on the
+     ;; same or smaller level than the current item's level
+     ((<= next-item-level item-level)
+      (setq subtree-end-point next-item-start-point)))
+    
+    subtree-end-point))
+
+
 (defun moin--list-move-subtree-up (&optional arg)
   "See `moin-command-meta-shift-up' for more information.
 Expects to actually be in a list as prerequisite. Never call this 
 function if point is currently not in a list."
   (let (current-list-item-info
-	other-list-item-info
 	current-item-level
 	current-item-start-point
-	current-item-end-point
-	other-item-level
-	other-item-start-point
 	current-subtree-end-point
+	previous-list-item-info
+	previous-item-level
+	previous-item-start-point
 	relative-point)
 
     (setq current-list-item-info (moin--list-get-item-info))
     (setq current-item-start-point (car current-list-item-info))
-    (setq current-item-end-point (car (cdr current-list-item-info)))
     (setq current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
     (setq relative-point (- (point) current-item-start-point))
 
     ;; Search for the end of the current item's subtree
-    (setq other-list-item-info
-	  (moin--list-get-sibling-item-info current-list-item-info 'moin--list-next-item-info))
-    
-    (setq other-item-start-point (car other-list-item-info))
-    (setq other-item-end-point (car (cdr other-list-item-info)))
-    (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
-
-    ;; Determine the end point of the current subtree (after trailing line break, if any, i.e. on
-    ;; the next line behind the last item's end point)
-    (cond
-     ;; The current item has no subtree
-     ((eq other-item-start-point current-item-start-point) 
-      (setq current-subtree-end-point
-	    (moin--list-point-at-beginning-of-next-line-or-eol current-item-end-point)))
-     ;; The list ends with a subtree item of the current item
-     ((> other-item-level current-item-level) 
-      (setq current-subtree-end-point
-	    (moin--list-point-at-beginning-of-next-line-or-eol other-item-end-point)))
-     ;; The subtree is followed up by a sibling list item on the
-     ;; same or smaller level than the current item's level
-     ((<= other-item-level current-item-level)
-      (setq current-subtree-end-point other-item-start-point)))
+    (setq current-subtree-end-point (moin--list-get-subtree-end-point current-list-item-info))
     
     ;; Search for the previous item on same level, if any
-    (setq other-list-item-info
+    (setq previous-list-item-info
 	  (moin--list-get-sibling-item-info current-list-item-info 'moin--list-previous-item-info))
 
-    (setq other-item-start-point (car other-list-item-info))
-    (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
+    (setq previous-item-start-point (car previous-list-item-info))
+    (setq previous-item-level (car (cdr (cdr (cdr previous-list-item-info)))))
 
     ;; There is no previous item on the same level
-    (if (or (eq other-item-start-point current-item-start-point)
-	    (not (eq other-item-level current-item-level)))
-	(user-error "Cannot move item up, it is already the first item in the subtree with the same level"))
+    (if (or (eq previous-item-start-point current-item-start-point)
+	    (not (eq previous-item-level current-item-level)))
+	(user-error "Cannot move subtree up, it is already the first item in the subtree with the same level"))
     
     ;; Perform the "item movement"
     (setq current-item-subtree (buffer-substring current-item-start-point current-subtree-end-point))
@@ -376,12 +386,55 @@ function if point is currently not in a list."
 
     (delete-forward-char (- current-subtree-end-point current-item-start-point))
 
-    (goto-char other-item-start-point)
+    (goto-char previous-item-start-point)
 
     (insert current-item-subtree)
     (if (not (eq (point) (point-at-bol)))
 	(newline))
-    (goto-char (+ other-item-start-point relative-point))))
+    (goto-char (+ previous-item-start-point relative-point))))
+
+
+(defun moin--list-move-subtree-down (&optional arg)
+  "See `moin-command-meta-shift-down' for more information.
+Expects to actually be in a list as prerequisite. Never call this 
+function if point is currently not in a list.
+
+Implementation idea: Go to the point after current list item's subtree. 
+If there is no follow-up item on the same level, throw an error. Otherwise
+move the next item up, reusing `moin--list-move-subtree-up'. Then position
+point such that it is at the same place relative to the item start."
+  (let (list-item-info
+  	current-item-level
+  	current-item-start-point
+  	subtree-end-point
+  	next-item-level
+  	next-item-start-point
+  	relative-point)
+
+    (setq list-item-info (moin--list-get-item-info))
+    (setq current-item-start-point (car list-item-info))
+    (setq current-item-level (car (cdr (cdr (cdr list-item-info)))))
+    (setq relative-point (- (point) current-item-start-point))
+
+    ;; Search for the end of the current item's subtree
+    (setq subtree-end-point (moin--list-get-subtree-end-point list-item-info))
+
+    (goto-char subtree-end-point)
+    
+    (setq list-item-info (moin--list-get-item-info))
+    (setq next-item-level (car (cdr (cdr (cdr list-item-info)))))
+    (setq next-item-start-point (car list-item-info))
+
+    (if (or (not list-item-info) (eq next-item-start-point current-item-start-point)
+	    (not (eq next-item-level current-item-level)))
+	(user-error "Cannot move subtree down, it is already the last item in the subtree with the same level"))
+    
+    (moin--list-move-subtree-up arg)
+    
+    (setq list-item-info (moin--list-get-item-info))
+    (setq subtree-end-point (moin--list-get-subtree-end-point list-item-info))
+    
+    (goto-char (+ current-item-start-point (- subtree-end-point (point)) relative-point))))
 
 
 ;; ==================================================

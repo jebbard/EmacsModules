@@ -76,8 +76,8 @@ the new point at the given expected-point."
 	(should (equal initial-text (buffer-string))))
 
       (if expected-point
-	  (should (equal expected-point (point)))
-	(should (equal initial-point (point)))))))
+      	  (should (equal expected-point (point)))
+      	(should (equal initial-point (point)))))))
 
 
 (defun check-read-only-func-at-point(func text initial-point &optional expected-return-value args expected-point region-size)
@@ -1620,3 +1620,73 @@ Expectations are given in the list form (current-column (start-point end-point c
    " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 24  'user-error)
   (check-func-at-point-throws-error func
    " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 68  'user-error))
+
+
+(ert-deftest test--moin-list-move-subtree-down ()
+  "Tests `moin-command-meta-down' for lists"
+  (test--check-moin-list-move-subtree-down 'moin-command-meta-down))
+
+(ert-deftest test--moin-list-move-subtree-down-shift ()
+  "Tests `moin-command-meta-shift-down' for lists"
+  (test--check-moin-list-move-subtree-down 'moin-command-meta-shift-down))
+
+
+(defun test--check-moin-list-move-subtree-down (func)
+  "Tests `moin-command-meta-down' for lists"
+
+  ;; Items without subitems, without multiline items
+  (check-func-at-point func
+  		       " * My item \n * Yours" 5 14 " * Yours\n * My item \n")
+  (check-func-at-point func
+  		       " * My item \n * Yours\n" 5 14 " * Yours\n * My item \n")
+  (check-func-at-point func
+  		       " * My item \n * Yours\n * third" 5 14 " * Yours\n * My item \n * third")
+  (check-func-at-point func
+  		       "Text before\n * My item \n * Yours\nText behind" 20 29
+  		       "Text before\n * Yours\n * My item \nText behind")
+  (check-func-at-point func
+  		       " * First item\n * My item \n * Yours\nText behind" 17 26
+  		       " * First item\n * Yours\n * My item \nText behind")
+  ;; Items without subitems, with multiline items
+  (check-func-at-point func
+  		       " * My item\n \n * Yours" 2 11 " * Yours\n * My item\n \n")
+  (check-func-at-point func
+   		       " * My item \n * Yours\n   \n \n \n" 3 20 " * Yours\n   \n \n \n * My item \n")
+  (check-func-at-point func
+  		       "TextBefore\n * My item\n \n * Yours\n\t\n \n \n * third\n \n \n \nTextBehind" 16 31
+  		       "TextBefore\n * Yours\n\t\n \n \n * My item\n \n * third\n \n \n \nTextBehind")
+  ;; Previous item has subitems
+  (check-func-at-point func
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 5 14
+  		       " * Yours\n * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n")
+  ;; Current item has subitems
+  (check-func-at-point func
+   " * My item\n * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2" 7 99
+   " * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2\n * My item\n")
+  ;; Most complex mixture of all cases
+  (check-func-at-point func
+  		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * Third item\n   * Text\n\n Any Text behind" 52 160
+  		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Third item\n   * Text\n\n Any Text behind"))
+
+
+(ert-deftest test--moin-list-move-subtree-down-error ()
+  "Tests `moin-command-meta-down' for lists in negative cases"
+  (test--check-moin-list-move-subtree-down-error 'moin-command-meta-down))
+
+
+(ert-deftest test--moin-list-move-subtree-down-shift-error ()
+  "Tests `moin-command-meta-shift-down' for lists in negative cases"
+  (test--check-moin-list-move-subtree-down-error 'moin-command-meta-shift-down))
+
+
+(defun test--check-moin-list-move-subtree-down-error (func)
+  "Tests `moin-command-meta-down' for lists in negative cases"
+  (check-func-at-point-throws-error func
+  		       " * My item \n * Yours" 15 'user-error)
+  (check-func-at-point-throws-error func
+  		       "Text before\n * My item \n * Yours\nText behind" 30 'user-error)
+  (check-func-at-point-throws-error func
+   " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 30  'user-error)
+  (check-func-at-point-throws-error func
+  				    " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 68  'user-error))
+
