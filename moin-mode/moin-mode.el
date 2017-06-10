@@ -106,6 +106,9 @@
 ;; v0.7    2017-05-14  Jens Ebert            <jensebert@gmx.net>
 ;; - Various table next row commands
 ;; - Table next field and table previous field
+;; v0.8    2017-06-10  Jens Ebert            <jensebert@gmx.net>
+;; - Finished all table and list commands including unittests
+;; - Moin mode feature-complete for v1.0
 
 ;;; Code:
 ;; ==================================================
@@ -320,7 +323,9 @@ current item with its subtree (i.e. all its children) by just removing one
 blank. A subtree's indentation can only be decreased if it is not already on
 the left-most indentation level of the list. If any item in the current 
 subtree spans over multiple lines, one blank is removed from each line,
-unless there is just a single blank left which is always kept."
+unless there is just a single blank left which is always kept. Point is kept
+before the current character, however, if point is at start of line, it
+remains there."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-remove-column arg)
@@ -345,7 +350,9 @@ beginning of the new column.
 current item with its subtree (i.e. all its children) by just adding one
 blank. An item's indentation can only be increased if it is not the first
 item below its parent. If any item in the current subtree item spans over
-multiple lines, one blank is added at the beginning of each line."
+multiple lines, one blank is added at the beginning of each line. Point is
+usually kept before the current character. However, if point is at start of
+line, it remains there."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-insert-column arg)
@@ -372,7 +379,8 @@ decreased if it is not already on the left-most indentation level of the list.
 Furthermore, if the item has children, its indentation cannot be decreased. Use 
 `moin-command-meta-shift-left' in this case instead. If the item spans over multiple
 lines, one blank is removed from each line, unless there is just a single blank left
-which is always kept."
+which is always kept. Point is kept before the current character, however, if point is
+at start of line, it remains there."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-move-column-left arg)
@@ -394,7 +402,9 @@ table to the right, but only if it is not already the right-most column.
 * If point is currently in a list, it increases the indentation by just adding
 one blank, leaving its children unchanged. An item's indentation can only be
 increased if it is not the first item below its parent. If the item spans over
-multiple lines, one blank is added at the beginning of each line."
+multiple lines, one blank is added at the beginning of each line. Point is
+usually kept before the current character. However, if point is at start of
+line, it remains there."
   (interactive "p")
   (if (moin-is-in-table-p)
       (moin--table-move-column-right arg)

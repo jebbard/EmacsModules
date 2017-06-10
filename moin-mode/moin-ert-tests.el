@@ -1691,73 +1691,122 @@ Expectations are given in the list form (current-column (start-point end-point c
   				    " * My item\n * Yours \n  * Subit 1\n   * Subit 1.1\n   * Subit 1.2\n    * Subitem 1.2.1" 68  'user-error))
 
 
-(ert-deftest test--moin-list-indent-item ()
-  "Tests `moin-command-meta-right' for lists"
-  
-  ;; Items without subitems, without multiline items
-  (check-func-at-point 'moin-command-meta-right
+(defun test--moin-list-indentation-no-subtree(command)
+  "Checks list indentation with or without subtree on items that do not
+have a subtree, the behavior for both commands must be the same."
+    ;; Items without subitems, without multiline items
+  (check-func-at-point command
   		       " * My item \n * Yours" 17 18 " * My item \n  * Yours")
-  (check-func-at-point 'moin-command-meta-right
+  (check-func-at-point command
   		       " * My item \n * Yours\n" 17 18 " * My item \n  * Yours\n")
-  (check-func-at-point 'moin-command-meta-right
+  (check-func-at-point command
   		       " * My item \n * Yours\n * third" 17 18 " * My item \n  * Yours\n * third")
-  (check-func-at-point 'moin-command-meta-right
+  (check-func-at-point command
   		       "Text before\n * My item \n * Yours\nText behind" 26 27
   		       "Text before\n * My item \n  * Yours\nText behind")
   ;; Indent multiline items
-  (check-func-at-point 'moin-command-meta-right
+  (check-func-at-point command
        " * My item\n * Yours\n   \n \n \n * third" 19 20 " * My item\n  * Yours\n    \n  \n  \n * third")
-  (check-func-at-point 'moin-command-meta-right
+  (check-func-at-point command
   " * My item\n * Yours\n   \n \n \n\t\n   \n * third" 19 20 " * My item\n  * Yours\n    \n  \n  \n \t\n    \n * third")
-  (check-func-at-point 'moin-command-meta-right
+  (check-func-at-point command
 		       "TextBefore\n * My item\n * Yours\n   \n \n \n\t\n   \nText behind" 30 31 "TextBefore\n * My item\n  * Yours\n    \n  \n  \n \t\n    \nText behind")
-  ;; Indent subitems
-  (check-func-at-point 'moin-command-meta-right
-  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 35 36
-  		       " * My item \n   * Subitem 1\n    * Subitem 2\n     * Subitem 2.1\n * Yours")
-  ;; Indent items after previous higher level items
-  (check-func-at-point 'moin-command-meta-right
+    ;; Indent items after previous higher level items
+  (check-func-at-point 'moin-command-meta-shift-right
   		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 70 71
   		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n  * Yours"))
 
 
-(ert-deftest test--moin-list-indent-item-error ()
-  "Tests `moin-command-meta-right' for lists in negative cases"
+(defun test--moin-list-indentation-error (command)
+  "Tests list indendation for any command in negative cases"
   
-  (check-func-at-point-throws-error 'moin-command-meta-right
+  (check-func-at-point-throws-error command
   		       " * My item" 9 'user-error)
-  (check-func-at-point-throws-error 'moin-command-meta-right
+  (check-func-at-point-throws-error command
   		       " * My item\n  * My Subitem" 16 'user-error))
 
+
+(ert-deftest test--moin-list-indent-item ()
+  "Tests `moin-command-meta-right' for lists"
+
+  (test--moin-list-indentation-no-subtree 'moin-command-meta-right)
+
+  ;; Parent item with subitems is indented - the child remains unchanged
+  (check-func-at-point 'moin-command-meta-right
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours" 35 36
+  		       " * My item \n   * Subitem 1\n    * Subitem 2\n     * Subitem 2.1\n * Yours"))
+
+
+(ert-deftest test--moin-list-indent-item-error ()
+  "Tests `moin-command-meta-right' for lists in negative cases"
+
+  (test--moin-list-indentation-error 'moin-command-meta-right))
+  
+
+(ert-deftest test--moin-list-indent-subtree ()
+  "Tests `moin-command-meta-shift-right' for lists"
+
+  (test--moin-list-indentation-no-subtree 'moin-command-meta-shift-right)
+  
+  ;; Indent parents with subitems
+  (check-func-at-point 'moin-command-meta-shift-right
+  		       " * Yours\n * My item \n  * Subitem 1\n  * Subitem 2\n   * Subitem 2.1" 13 14
+  		       " * Yours\n  * My item \n   * Subitem 1\n   * Subitem 2\n    * Subitem 2.1")
+  (check-func-at-point 'moin-command-meta-shift-right
+  		       " * Yours\n * My item \n  * Subitem 1\n  * Subitem 2\n   * Subitem 2.1" 36 36
+  		       " * Yours\n * My item \n  * Subitem 1\n   * Subitem 2\n    * Subitem 2.1"))
+
+
+(ert-deftest test--moin-list-indent-subtree-error ()
+  "Tests `moin-command-meta-shift-right' for lists in negative cases"
+
+  (test--moin-list-indentation-error 'moin-command-meta-shift-right))
+
+
+(defun test--moin-list-outdentation-no-subtree(command)
+  "Checks list outdentation with or without subtree on items that do not
+have a subtree, the behavior for both commands must be the same."
+  
+  ;; Items without subitems, without multiline items
+  (check-func-at-point command
+  		       " * My item \n  * Yours" 18 17 " * My item \n * Yours")
+  (check-func-at-point command
+  		       " * My item \n  * Yours\n" 13 13 " * My item \n * Yours\n")
+  (check-func-at-point command
+  		       " * My item \n  * Yours\n * third" 18 17 " * My item \n * Yours\n * third")
+  (check-func-at-point command
+  		       "Text before\n * My item \n  * Yours\nText behind" 27 26
+  		       "Text before\n * My item \n * Yours\nText behind")
+  ;; Outdent multiline items
+  (check-func-at-point command
+       " * My item\n  * Yours\n   \n \n \n * third" 20 19 " * My item\n * Yours\n  \n \n \n * third")
+  (check-func-at-point command
+  " * My item\n  * Yours\n   \n \n \n\t\n   \n * third" 20 19 " * My item\n * Yours\n  \n \n \n\t\n  \n * third")
+  (check-func-at-point command
+  		       "TextBefore\n * My item\n  * Yours\n   \n \n \n\t\n   \nText behind" 31 30 "TextBefore\n * My item\n * Yours\n  \n \n \n\t\n  \nText behind")
+  ;; Outdent subitems
+  (check-func-at-point command
+  		       " * My item \n   * Subitem 1\n    * Subitem 1.1\n   * Subitem 2\n * Yours" 52 51
+  		       " * My item \n   * Subitem 1\n    * Subitem 1.1\n  * Subitem 2\n * Yours")
+  ;; Outdent items after previous higher level items
+  (check-func-at-point command
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n  * Yours" 71 70
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours"))
+
+
+(defun test--moin-list-outdentation-error (command)
+  "Tests list outdendation for any command in negative cases"
+  
+  (check-func-at-point-throws-error command
+  		       " * My item" 9 'user-error)
+  (check-func-at-point-throws-error command
+  				    " * My item\n * My Subitem" 16 'user-error))
+  
 
 (ert-deftest test--moin-list-outdent-item ()
   "Tests `moin-command-meta-left' for lists"
   
-  ;; Items without subitems, without multiline items
-  (check-func-at-point 'moin-command-meta-left
-  		       " * My item \n  * Yours" 18 17 " * My item \n * Yours")
-  (check-func-at-point 'moin-command-meta-left
-  		       " * My item \n  * Yours\n" 18 17 " * My item \n * Yours\n")
-  (check-func-at-point 'moin-command-meta-left
-  		       " * My item \n  * Yours\n * third" 18 17 " * My item \n * Yours\n * third")
-  (check-func-at-point 'moin-command-meta-left
-  		       "Text before\n * My item \n  * Yours\nText behind" 27 26
-  		       "Text before\n * My item \n * Yours\nText behind")
-  ;; Indent multiline items
-  (check-func-at-point 'moin-command-meta-left
-       " * My item\n  * Yours\n   \n \n \n * third" 20 19 " * My item\n * Yours\n  \n \n \n * third")
-  (check-func-at-point 'moin-command-meta-left
-  " * My item\n  * Yours\n   \n \n \n\t\n   \n * third" 20 19 " * My item\n * Yours\n  \n \n \n\t\n  \n * third")
-  (check-func-at-point 'moin-command-meta-left
-		       "TextBefore\n * My item\n  * Yours\n   \n \n \n\t\n   \nText behind" 31 30 "TextBefore\n * My item\n * Yours\n  \n \n \n\t\n  \nText behind")
-  ;; Indent subitems
-  (check-func-at-point 'moin-command-meta-left
-  		       " * My item \n   * Subitem 1\n    * Subitem 1.1\n   * Subitem 2\n * Yours" 52 51
-  		       " * My item \n   * Subitem 1\n    * Subitem 1.1\n  * Subitem 2\n * Yours")
-  ;; Indent items after previous higher level items
-  (check-func-at-point 'moin-command-meta-left
-  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n  * Yours" 71 70
-  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours"))
+  (test--moin-list-outdentation-no-subtree 'moin-command-meta-left))
 
 
 (ert-deftest test--moin-list-outdent-item-error ()
@@ -1768,6 +1817,23 @@ Expectations are given in the list form (current-column (start-point end-point c
   (check-func-at-point-throws-error 'moin-command-meta-left
   				    " * My item\n * My Subitem" 16 'user-error)
   (check-func-at-point-throws-error 'moin-command-meta-left
-  				    " * My item\n  * My Subitem\n   * My Subsubitem" 16 'user-error)
-  )
+  				    " * My item\n  * My Subitem\n   * My Subsubitem" 16 'user-error))
+
+
+(ert-deftest test--moin-list-outdent-subtree ()
+  "Tests `moin-command-meta-shift-left' for lists"
+  (test--moin-list-outdentation-no-subtree 'moin-command-meta-shift-left)
   
+  ;; Outdent parents with subitems
+  (check-func-at-point 'moin-command-meta-shift-left
+  		       " * Yours\n  * My item \n   * Subitem 1\n   * Subitem 2\n    * Subitem 2.1" 14 13
+  		       " * Yours\n * My item \n  * Subitem 1\n  * Subitem 2\n   * Subitem 2.1")
+  (check-func-at-point 'moin-command-meta-shift-left
+  		       " * Yours\n * My item \n  * Subitem 1\n  * Subitem 2\n   * Subitem 2.1" 37 36
+  		       " * Yours\n * My item \n  * Subitem 1\n * Subitem 2\n  * Subitem 2.1"))
+
+
+(ert-deftest test--moin-list-outdent-subtree-error ()
+  "Tests `moin-command-meta-shift-left' for lists in negative cases"
+  
+  (test--moin-list-outdentation-error 'moin-command-meta-shift-left))

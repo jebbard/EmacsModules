@@ -186,103 +186,144 @@ function if point is currently not in a list."
   (insert list-string))
 
 
-(defun moin--list-indent-item (&optional arg)
-  "See `moin-command-meta-right' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
+(defun moin--list-do-change-level(change-end-point-func check-func change-func point-shift)
+  "Performs the actual change of the list item level until an end point.
+Uses a whole lot of functions passed as parameter to customize this function, based 
+on:
+* Dimension 1 - whether its an indentation or an outdentation
+* Dimension 2 - whether it is with or without subtree
+
+Both dimensions are covered by this function by just passing different
+helper functions as parameters:
+* change-end-point-func: Function used to determine what the end point of the level
+change is; the level is only changed until including the last line before the 
+determined end point.
+* check-func: Function used to verify that level change is possible for the
+current item, where the current-item-level is passed to that function.
+* change-func: The function used to actually change the level of the list item,
+invoked once per line with point at beginning of each line as prerequisite.
+* point-shift: Point is shifted by point-shift (either negative or positive)."
   (let (current-list-item-info
 	current-item-start-point
-	current-item-end-point
+	current-change-end-point
 	current-item-level
-	previous-list-item-info
-	previous-item-level
-	current-point)
+	current-point
+	current-point-at-bol-p
+	blanks-considered-so-far)
 
     (setq current-point (point))
+    (setq current-point-at-bol-p (eq current-point (point-at-bol)))
     
     (setq current-list-item-info (moin--list-get-item-info))
     (setq current-item-start-point (car current-list-item-info))
-    (setq current-item-end-point (car (cdr current-list-item-info)))
     (setq current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
+    
+    (setq current-change-end-point (funcall change-end-point-func current-list-item-info))
 
-    (setq previous-list-item-info (moin--list-previous-item-info current-list-item-info))
-    (setq previous-item-level (car (cdr (cdr (cdr previous-list-item-info)))))
-
-    (if (or (not previous-list-item-info) (< previous-item-level current-item-level))
-	(user-error "Cannot indent first item of a list"))
+    (funcall check-func current-item-level)
     
     (goto-char current-item-start-point)
 
-    (setq blanks-added-so-far 0)
+    (setq blanks-considered-so-far 0)
     
-    (while (and (<= (point) (+ blanks-added-so-far current-item-end-point)) (not (eobp)))
+    (while (and (<= (point) (+ blanks-considered-so-far current-change-end-point)) (not (eobp)))
       (beginning-of-line)
-      (insert " ")
-      (setq blanks-added-so-far (+ 1 blanks-added-so-far))
+      (funcall change-func)
+      
+      (setq blanks-considered-so-far (+ 1 blanks-considered-so-far))
       (end-of-line)
       (if (not (eobp))
 	  (next-line)))
 
-    (goto-char (+ current-point 1))))
+    (if current-point-at-bol-p
+	(goto-char current-point)
+      (goto-char (+ current-point point-shift)))))
+
+
+(defun moin--list-check-outdent(current-item-level)
+  "Checks if outdentation of the current item is in principle possible,
+and if not, throws a user-error."
+  (if (eq current-item-level 1)
+      (user-error "Cannot outdent top-level items")))
+
+
+(defun moin--list-check-outdent-item-without-subtree(current-item-level)
+  "Checks if outdentation of the current item without subtree is possible,
+and if not, throws a user-error."
+  (let ((other-list-item-info (moin--list-next-item-info current-list-item-info))
+	other-item-level)
+    
+    (moin--list-check-outdent current-item-level)
+
+    (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
+
+    (if (and other-list-item-info (> other-item-level current-item-level))
+	(user-error "Cannot outdent an item without its children"))))
+
+
+(defun moin--list-do-outdent()
+  "Performs actual list outdentation of a single line."
+  (if (looking-at "[ \t][ \t]")
+      (delete-char 1)))
 
 
 (defun moin--list-outdent-item (&optional arg)
   "See `moin-command-meta-left' for more information.
 Expects to actually be in a list as prerequisite. Never call this 
 function if point is currently not in a list."
-  (let (current-list-item-info
-	current-item-start-point
-	current-item-end-point
-	current-item-level
-	previous-list-item-info
-	previous-item-level
-	current-point)
-
-    (setq current-point (point))
-    
-    (setq current-list-item-info (moin--list-get-item-info))
-    (setq current-item-start-point (car current-list-item-info))
-    (setq current-item-end-point (car (cdr current-list-item-info)))
-    (setq current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
-
-    (setq previous-list-item-info (moin--list-next-item-info current-list-item-info))
-    (setq previous-item-level (car (cdr (cdr (cdr previous-list-item-info)))))
-
-    (if (eq current-item-level 1)
-	(user-error "Cannot outdent top-level items"))
-    
-    (if (and previous-list-item-info (> previous-item-level current-item-level))
-     	(user-error "Cannot outdent an item without its children"))
-    
-    (goto-char current-item-start-point)
-
-    (setq blanks-added-so-far 0)
-    
-    (while (and (<= (point) (+ blanks-added-so-far current-item-end-point)) (not (eobp)))
-      (beginning-of-line)
-      (if (looking-at "[ \t][ \t]")
-	  (delete-char 1))
-      
-      (setq blanks-added-so-far (+ 1 blanks-added-so-far))
-      (end-of-line)
-      (if (not (eobp))
-	  (next-line)))
-
-    (goto-char (- current-point 1))))
-
-
-(defun moin--list-indent-subtree (&optional arg)
-  "See `moin-command-meta-right' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
-  (user-error "Not implemented yet for lists!"))
+    (moin--list-do-change-level
+   '(lambda (current-list-item-info) (car (cdr current-list-item-info)))
+   'moin--list-check-outdent-item-without-subtree
+   'moin--list-do-outdent
+   -1))
 
 
 (defun moin--list-outdent-subtree (&optional arg)
   "See `moin-command-meta-right' for more information.
 Expects to actually be in a list as prerequisite. Never call this 
 function if point is currently not in a list."
-  (user-error "Not implemented yet for lists!"))
+    (moin--list-do-change-level
+   '(lambda (current-list-item-info) (moin--list-get-subtree-end-point current-list-item-info))
+   'moin--list-check-outdent
+   'moin--list-do-outdent
+   -1))
+
+
+(defun moin--list-check-indent(current-item-level)
+  "Checks if indentation of the current item is possible, and if not, throws a user-error."
+  (setq other-list-item-info (moin--list-previous-item-info current-list-item-info))
+  
+  (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
+  
+  (if (or (not other-list-item-info) (< other-item-level current-item-level))
+      (user-error "Cannot indent first item of a list")))
+
+
+(defun moin--list-do-indent()
+  "Performs actual list indentation of a single line."
+  (insert " "))
+
+
+(defun moin--list-indent-item (&optional arg)
+  "See `moin-command-meta-right' for more information.
+Expects to actually be in a list as prerequisite. Never call this 
+function if point is currently not in a list."
+    (moin--list-do-change-level
+   '(lambda (current-list-item-info) (car (cdr current-list-item-info)))
+   'moin--list-check-indent
+   'moin--list-do-indent
+   +1))
+
+
+(defun moin--list-indent-subtree (&optional arg)
+  "See `moin-command-meta-right' for more information.
+Expects to actually be in a list as prerequisite. Never call this 
+function if point is currently not in a list."
+    (moin--list-do-change-level
+   '(lambda (current-list-item-info) (moin--list-get-subtree-end-point current-list-item-info))
+   'moin--list-check-indent
+   'moin--list-do-indent
+   +1))
 
 
 (defun moin--list-previous-item-info(current-item-info)
