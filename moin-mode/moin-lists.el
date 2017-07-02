@@ -232,6 +232,7 @@ helper functions as parameters:
 	current-change-end-point
 	current-item-level
 	current-point
+	current-column
 	current-point-at-bol-p
 	blanks-considered-so-far)
 
@@ -244,7 +245,7 @@ helper functions as parameters:
     
     (setq current-change-end-point (funcall change-end-point-func current-list-item-info))
 
-    (funcall check-func current-item-level)
+    (funcall check-func current-list-item-info)
     
     (goto-char current-item-start-point)
 
@@ -255,29 +256,40 @@ helper functions as parameters:
       (funcall change-func)
       
       (setq blanks-considered-so-far (+ 1 blanks-considered-so-far))
+
+      (setq current-column (current-column))
+      
       (end-of-line)
       (if (not (eobp))
-	  (forward-line)))
+	  (progn
+	    ;; In contrast to next-line, forward-line goes to the start of the next line!
+	    ;; So we have to manually move to the previously set column
+	    (forward-line)
+	    (move-to-column current-column))))
 
     (if current-point-at-bol-p
 	(goto-char current-point)
       (goto-char (+ current-point point-shift)))))
 
 
-(defun moin--list-check-outdent(current-item-level)
-  "Checks if outdentation of the current item is possible, and if not,
-throws a user-error."
-  (if (eq current-item-level 1)
-      (user-error "Cannot outdent top-level items")))
+(defun moin--list-check-outdent(current-list-item-info)
+  "Based on the CURRENT-LIST-ITEM-INFO provided, this function checks
+if outdentation of the current item is possible, and if not, throws a
+user-error."
+  (let ((current-item-level (car (cdr (cdr (cdr current-list-item-info))))))
+    (if (eq current-item-level 1)
+	(user-error "Cannot outdent top-level items"))))
 
 
-(defun moin--list-check-outdent-item-without-subtree(current-item-level)
-  "Checks if outdentation of the current item without subtree is
-possible, and if not, throws a user-error."
-  (let ((other-list-item-info (moin--list-next-item-info current-list-item-info))
+(defun moin--list-check-outdent-item-without-subtree(current-list-item-info)
+  "Based on the CURRENT-LIST-ITEM-INFO provided, this function checks
+if outdentation of the current item without subtree is possible, and
+if not, throws a user-error."
+  (let ((current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
+	(other-list-item-info (moin--list-next-item-info current-list-item-info))
 	other-item-level)
     
-    (moin--list-check-outdent current-item-level)
+    (moin--list-check-outdent current-list-item-info)
 
     (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
 
@@ -313,15 +325,18 @@ point is currently not in a list."
    -1))
 
 
-(defun moin--list-check-indent(current-item-level)
-  "Checks if indentation of the current item is possible, and if not,
-throws a user-error."
-  (setq other-list-item-info (moin--list-previous-item-info current-list-item-info))
+(defun moin--list-check-indent(current-list-item-info)
+  "Based on the CURRENT-LIST-ITEM-INFO provided, this function checks
+if indentation of the current item is possible, and if not, throws a
+user-error."
+  (let ((current-item-level (car (cdr (cdr (cdr current-list-item-info)))))
+	(other-list-item-info (moin--list-previous-item-info current-list-item-info))
+	other-item-level)
   
   (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
   
   (if (or (not other-list-item-info) (< other-item-level current-item-level))
-      (user-error "Cannot indent first item of a list")))
+      (user-error "Cannot indent first item of a list"))))
 
 
 (defun moin--list-do-indent()
@@ -446,22 +461,24 @@ the next line, or if there is no next line, the point at end of line."
     (if (eobp)
 	(point-at-eol)
       (progn
-	(next-line)
+	(forward-line)
 	(point-at-bol)))))
 
 
 (defun moin--list-get-subtree-end-point (list-item-info)
-  "Determin the end-point of the subtree of the given list-item-info,
+  "Determine the end point of the subtree of the given LIST-ITEM-INFO,
 i.e. the point where the last child subitem of the given item ends.
 Even that is not fully correct - we return the point on the beginning
 of the next line after the last child, if there is a next line,
 otherwise the point at eol."
   (let (next-list-item-info
-	subtree-end-point)
-    
-    (setq item-start-point (car list-item-info))
-    (setq item-end-point (car (cdr list-item-info)))
-    (setq item-level (car (cdr (cdr (cdr list-item-info)))))
+	subtree-end-point
+	(item-start-point (car list-item-info))
+	(item-end-point (car (cdr list-item-info)))
+	(item-level (car (cdr (cdr (cdr list-item-info)))))
+	next-item-start-point
+	next-item-end-point
+	next-item-level)
 
     ;; Search for the end of the current item's subtree
     (setq next-list-item-info
@@ -501,7 +518,8 @@ point is currently not in a list."
 	previous-list-item-info
 	previous-item-level
 	previous-item-start-point
-	relative-point)
+	relative-point
+	current-item-subtree)
 
     (setq current-list-item-info (moin--list-get-item-info))
     (setq current-item-start-point (car current-list-item-info))
@@ -528,7 +546,7 @@ point is currently not in a list."
 
     (goto-char current-item-start-point)
 
-    (delete-forward-char (- current-subtree-end-point current-item-start-point))
+    (delete-char (- current-subtree-end-point current-item-start-point))
 
     (goto-char previous-item-start-point)
 

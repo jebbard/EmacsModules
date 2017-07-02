@@ -120,6 +120,9 @@
 ;; v0.8    2017-06-10  Jens Ebert            <jensebert@gmx.net>
 ;; - Finished all table and list commands including unittests
 ;; - Moin mode feature-complete for v1.0
+;; v0.9    2017-07-02  Jens Ebert            <jensebert@gmx.net>
+;; - Cleaned all flycheck warnings (except unnecessary documentation warnings)
+;; - Cleaned all elint warnings
 
 ;;; Code:
 ;; ==================================================

@@ -24,7 +24,7 @@
 
 ;; Face definitions for moin mode
 
-;;; Code
+;;; Code:
 
 ;; ==================================================
 ;; Required mandatory packages
