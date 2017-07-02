@@ -24,35 +24,38 @@
 
 ;; List support for moin mode
 
-;;; Code
+;;; Code:
 
 
 ;; ==================================================
 ;; Constants
 
 (defconst moin-const-bullet-list " * "
-  "Starter string for bullet-point list")
+  "Starter string for bullet-point list.")
 
 (defconst moin-const-numbered-list " 1. "
-  "Starter string for numbered list")
+  "Starter string for numbered list.")
 
 ;; ==================================================
 ;; Functions
 
 (defun moin-is-in-list-p ()
-  "Is point on a list line? MoinMoin also allows an arbitrary number of 
-blank lines or lines with only whitespaces between two list items. Furthermore,
-as soon as there is at least one blank or tab at the beginning of a line, it is 
-considered to belong to a list, if a previous line contains a list. Only lines 
-with a non-whitespace character as first character of the line break the list."
-  ;; Usually we like to avoid doing the same thing twice, but here:
-  ;; First any list related command in moin-mode.el will call this function
-  ;; to determine whether in a list, and then any sub-function called by it
-  ;; will again call `moin--list-get-item-info', resulting in one additional,
-  ;; but unnecessary call. However, the alternatives would either mean to break
-  ;; with the common structure of the rest of the mode (tables and headings), or
-  ;; introducing strange global variables. As most modern computers should be
-  ;; able to handle this thing, we decided to call `moin--list-get-item-info' twice.
+  "Is point on a list line? MoinMoin also allows an arbitrary number
+of blank lines or lines with only whitespaces between two list items.
+Furthermore, as soon as there is at least one blank or tab at the
+beginning of a line, it is considered to belong to a list, if the
+previous line belongs to a list. Only lines with a non-whitespace
+character as first character of the line do break the list."
+  ;; Usually we like to avoid doing the same thing twice, but here it
+  ;; is different, intentionally: First any list-related command in
+  ;; moin-mode.el will call this function to determine whether in a
+  ;; list, and then any sub-function called by it will again call
+  ;; `moin--list-get-item-info', resulting in one additional, but
+  ;; actually unnecessary call. However, the alternatives would either
+  ;; mean to break with the common structure of the rest of the
+  ;; moinmode (tables and headings), or introducing strange global
+  ;; variables. As we cannot expect any significant performance issues
+  ;; by that, we decided to call `moin--list-get-item-info' twice.
   (if (eq nil (moin--list-get-item-info))
       nil
     t))
@@ -62,29 +65,42 @@ with a non-whitespace character as first character of the line break the list."
 ;; "Private" Functions
 
 (defun moin--list-get-item-info()
-  "Retrieves information about the current list item where point is on. Always 
-expects to currently be in a list, so any caller must ensure that this is actually
-the case. An item info always only refers to the current item and does not care
-whether this item is part of the subtree of another item, or it has a subtree itself.
+  "Retrieves information about the current list item where point is
+on. Always expects to currently be in a list, so any caller must
+ensure that this is actually the case. An item info always only refers
+to the current item and does not care whether this item is part of the
+subtree of another item, or it has a subtree itself.
 
 The returned information is: 
-(start-point end-point preamble-end-point level whitespace-before-bullet starting-bullet whitespace-after-bullet), where
-* start-point is the start point of the item, i.e. the beginning of the line 
-where the starting bullet or number of the list is located on
-* end-point is the end point of the item, i.e. the point after the last character
-(excluding last newline) of the item; this IS NOT the point after the last subtree
-item of the current item, i.e. if the current item has sub-items, it is the point
-at eol before the first subitem.
-* preamble-end-point is the end point of the preamble, i.e. the text including 
-whitespace, starting bullet or number and any further whitspace before the actual 
-item text starts
-* level is an integer specifying the level this item is on, basically the number of
-whitespace characters in front o the starting-bullet
-* whitespace-before-bullet contains any whitespace before the starting bullet or number
-* starting-bullet contains the text of the starting bullet or number without any 
-whitespace, including a trailing dot for numbers
-* whitespace-after-bullet contains any whitespace after the starting bullet or number and
-before the first text character of the item"
+
+        (start-point
+         end-point
+         preamble-end-point
+         level
+         whitespace-before-bullet
+         starting-bullet
+         whitespace-after-bullet),
+
+where
+ * start-point is the start point of the item, i.e. the beginning of
+   the line where the starting bullet or number of the list is located
+   on
+ * end-point is the end point of the item, i.e. the point after the
+   last character (excluding last newline) of the item; this IS NOT
+   the point after the last subtree item of the current item, i.e. if
+   the current item has sub-items, it is the point at eol before the
+   first subitem.
+ * preamble-end-point is the end point of the preamble, i.e. the text
+   including whitespace, starting bullet or number and any further
+   whitspace before the actual item text starts
+ * level is an integer specifying the level this item is on, basically
+   the number of whitespace characters in front of the starting-bullet
+ * whitespace-before-bullet contains any whitespace before the
+   starting bullet or number
+ * starting-bullet contains the text of the starting bullet or number
+   without any whitespace, including a trailing dot for numbers
+ * whitespace-after-bullet contains any whitespace after the starting
+   bullet or number and before the first text character of the item"
 (let (start-point
       end-point
       preamble-end-point
@@ -101,7 +117,7 @@ before the first text character of the item"
     (beginning-of-line)
     
     (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not (bobp)))
-      (previous-line)
+      (forward-line -1)
       (beginning-of-line))
 
     (setq really-in-list-p (looking-at list-regex))
@@ -129,7 +145,7 @@ before the first text character of the item"
 		   (if (eobp)
 			 nil
 		     (progn
-		       (next-line)
+		       (forward-line)
 		       (beginning-of-line)
 		       (and (looking-at "^\\s-") (not (looking-at list-regex))))))))
 	
@@ -139,10 +155,10 @@ before the first text character of the item"
     nil)))
 
 
-(defun moin--list-insert-item-same-level (&optional arg)
-  "See `moin-command-meta-return' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
+(defun moin--list-insert-item-same-level ()
+  "See `moin-command-meta-return' for more information. Expects to
+actually be in a list as prerequisite. Never call this function if
+point is currently not in a list."
   (let (item-start-pos
 	item-preamble-end-pos
 	item-whitespace-before
@@ -169,7 +185,7 @@ function if point is currently not in a list."
 	  (insert item-starting-bullet)
 	  (insert item-whitespace-after)
 	  (newline)
-	  (previous-line)
+	  (forward-line -1)
 	  (end-of-line))
       ;; Item text starts before point -> Split item and insert new item after current
       (progn
@@ -180,29 +196,37 @@ function if point is currently not in a list."
 
 
 (defun moin--list-insert-item (list-string)
-  "Inserts a new item with the given list-string after the current item"
+  "Inserts a new item with the given LIST-STRING after the current item."
   (unless (or (looking-at "^\\s-*?$") (bolp))
     (newline))
   (insert list-string))
 
 
 (defun moin--list-do-change-level(change-end-point-func check-func change-func point-shift)
-  "Performs the actual change of the list item level until an end point.
-Uses a whole lot of functions passed as parameter to customize this function, based 
-on:
-* Dimension 1 - whether its an indentation or an outdentation
-* Dimension 2 - whether it is with or without subtree
+  "Performs the actual change of the list item level, including all
+list items from current point until an end point. Uses functions
+passed as parameter to customize this function, based on:
+ * Dimension 1 - whether its an indentation or an outdentation
+ * Dimension 2 - whether it is with or without subtree
 
 Both dimensions are covered by this function by just passing different
 helper functions as parameters:
-* change-end-point-func: Function used to determine what the end point of the level
-change is; the level is only changed until including the last line before the 
-determined end point.
-* check-func: Function used to verify that level change is possible for the
-current item, where the current-item-level is passed to that function.
-* change-func: The function used to actually change the level of the list item,
-invoked once per line with point at beginning of each line as prerequisite.
-* point-shift: Point is shifted by point-shift (either negative or positive)."
+ * CHANGE-END-POINT-FUNC: Function used to determine what the end
+   point of the level change is; the level is only changed until (and
+   including) the last line before the determined end point. The
+   list-item-info of the current item is passed to this function, and
+   a point (i.e. an integer position in the buffer) is expected as
+   return value.
+ * CHECK-FUNC: Function used to verify that level change is possible
+   for the current item. The current-item-level is passed to that
+   function, no return value is expected. It throws an error if level
+   change is not possible.
+ * CHANGE-FUNC: The function used to actually change the level of the
+   list item, invoked once per line with point at beginning of each
+   line. No parameters are passed to this function, no return value is
+   expected.
+ * POINT-SHIFT: Point is shifted by point-shift (either negative or
+   positive integer)."
   (let (current-list-item-info
 	current-item-start-point
 	current-change-end-point
@@ -233,7 +257,7 @@ invoked once per line with point at beginning of each line as prerequisite.
       (setq blanks-considered-so-far (+ 1 blanks-considered-so-far))
       (end-of-line)
       (if (not (eobp))
-	  (next-line)))
+	  (forward-line)))
 
     (if current-point-at-bol-p
 	(goto-char current-point)
@@ -241,15 +265,15 @@ invoked once per line with point at beginning of each line as prerequisite.
 
 
 (defun moin--list-check-outdent(current-item-level)
-  "Checks if outdentation of the current item is in principle possible,
-and if not, throws a user-error."
+  "Checks if outdentation of the current item is possible, and if not,
+throws a user-error."
   (if (eq current-item-level 1)
       (user-error "Cannot outdent top-level items")))
 
 
 (defun moin--list-check-outdent-item-without-subtree(current-item-level)
-  "Checks if outdentation of the current item without subtree is possible,
-and if not, throws a user-error."
+  "Checks if outdentation of the current item without subtree is
+possible, and if not, throws a user-error."
   (let ((other-list-item-info (moin--list-next-item-info current-list-item-info))
 	other-item-level)
     
@@ -267,10 +291,10 @@ and if not, throws a user-error."
       (delete-char 1)))
 
 
-(defun moin--list-outdent-item (&optional arg)
-  "See `moin-command-meta-left' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
+(defun moin--list-outdent-item ()
+  "See `moin-command-meta-left' for more information. Expects to
+actually be in a list as prerequisite. Never call this function if
+point is currently not in a list."
     (moin--list-do-change-level
    '(lambda (current-list-item-info) (car (cdr current-list-item-info)))
    'moin--list-check-outdent-item-without-subtree
@@ -278,10 +302,10 @@ function if point is currently not in a list."
    -1))
 
 
-(defun moin--list-outdent-subtree (&optional arg)
-  "See `moin-command-meta-right' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
+(defun moin--list-outdent-subtree ()
+  "See `moin-command-meta-right' for more information. Expects to
+actually be in a list as prerequisite. Never call this function if
+point is currently not in a list."
     (moin--list-do-change-level
    '(lambda (current-list-item-info) (moin--list-get-subtree-end-point current-list-item-info))
    'moin--list-check-outdent
@@ -290,7 +314,8 @@ function if point is currently not in a list."
 
 
 (defun moin--list-check-indent(current-item-level)
-  "Checks if indentation of the current item is possible, and if not, throws a user-error."
+  "Checks if indentation of the current item is possible, and if not,
+throws a user-error."
   (setq other-list-item-info (moin--list-previous-item-info current-list-item-info))
   
   (setq other-item-level (car (cdr (cdr (cdr other-list-item-info)))))
@@ -304,10 +329,10 @@ function if point is currently not in a list."
   (insert " "))
 
 
-(defun moin--list-indent-item (&optional arg)
-  "See `moin-command-meta-right' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
+(defun moin--list-indent-item ()
+  "See `moin-command-meta-right' for more information. Expects to
+actually be in a list as prerequisite. Never call this function if
+point is currently not in a list."
     (moin--list-do-change-level
    '(lambda (current-list-item-info) (car (cdr current-list-item-info)))
    'moin--list-check-indent
@@ -315,10 +340,10 @@ function if point is currently not in a list."
    +1))
 
 
-(defun moin--list-indent-subtree (&optional arg)
-  "See `moin-command-meta-right' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
+(defun moin--list-indent-subtree ()
+  "See `moin-command-meta-right' for more information. Expects to
+actually be in a list as prerequisite. Never call this function if
+point is currently not in a list."
     (moin--list-do-change-level
    '(lambda (current-list-item-info) (moin--list-get-subtree-end-point current-list-item-info))
    'moin--list-check-indent
@@ -327,8 +352,8 @@ function if point is currently not in a list."
 
 
 (defun moin--list-previous-item-info(current-item-info)
-  "Determines the list item info of the previous list item, if any, 
-and returns it. If there is no previous item, returns nil. See 
+  "Determines the list-item-info of the previous list item, if any,
+and returns it. If there is no previous item, returns nil. See
 `moin--list-get-item-info' for details about the returned data
 structure."
   (let (current-start-point)
@@ -340,13 +365,13 @@ structure."
     (if (bobp)
 	nil
       (progn
-	(previous-line)
+	(forward-line -1)
 	(moin--list-get-item-info)))))
 
 
 (defun moin--list-next-item-info(current-item-info)
-  "Determines the list item info of the next list item, if any, 
-and returns it. If there is no next item, returns nil. See 
+  "Determines the list-item-info of the next list item, if any, and
+returns it. If there is no next item, returns nil. See
 `moin--list-get-item-info' for details about the returned data
 structure."
   (let (current-end-point)
@@ -358,33 +383,39 @@ structure."
     (if (eobp)
 	nil
       (progn
-	(next-line)
+	(forward-line)
 	(moin--list-get-item-info)))))
 
 
 (defun moin--list-get-sibling-item-info(current-list-item-info move-func)
-  "This function returns the list item info structure - see 
-`moin--list-get-item-info' for how it is defined - of a sibling list item based 
-on the given current-list-item-info, ideally with the same level, depending on
-move-func.
-There are following cases:
-* move-func = `moin--list-next-item-info': This function searches the next list
-item below the current item, preferably with the same level as the current item.
-If the current item is the very last item in the list without any subitems, its 
-item info itself is returned. If the current item subtree is the last subtree in
-the list, the info of its last subtree item is returned. If there is a next item
-with smaller level only, this item's info is returned.
-* move-func = `moin--list-previous-item-info': This function searches the
-previous list item above the current item, preferably with the same level as the
-current item. If the current item is the first item in the list, its item info
-itself is returned. If the current item is not the first item in the list, it
-returns the item info of the nearest previous item with the same or a smaller
-level. If there is no such item, and still the current item is not the very first
-item in the list, the list is actually malformed, but this function simply returns
-the item info of the last item it can find.
+  "This function returns the list-item-info structure - see
+`moin--list-get-item-info' for how it is defined - of a sibling list
+item based on the given current-list-item-info, ideally with the same
+level, depending on move-func.
 
-Thus, to e.g. determine if there really is a previous item with the same level,
-callers need to check the start point as well as the level of the returned item info."
+There are following cases:
+ * move-func = `moin--list-next-item-info': This function searches the
+   next list item below the current item, preferably with the same
+   level as the current item. The behaviour in the case that there is
+   no next item with the same level is as follows: If the current item
+   is the very last item in the list without any subitems, its item
+   info itself is returned. If the current item subtree is the last
+   subtree in the list, the info of its last subtree item is returned.
+   If there is a next item with smaller level only, this item's info
+   is returned.
+ * move-func = `moin--list-previous-item-info': This function searches
+   the previous list item above the current item, preferably with the
+   same level as the current item. The behaviour in the case that
+   there is no previous item with the same level is as follows: If the
+   current item is the first item in the list, its item info itself is
+   returned. If the current item is not the first item in the list,
+   and there is a previous item, but none with the same level, the
+   list is actually malformed, but this function simply returns the
+   item info of the previous item it can find.
+
+Thus, to e.g. determine if there really is a previous item with the
+same level, callers need to check the start point as well as the level
+of the list-item-info returned by this function."
   (let (returned-list-item-info
 	other-list-item-info
 	current-item-level
@@ -408,8 +439,8 @@ callers need to check the start point as well as the level of the returned item 
 
 
 (defun moin--list-point-at-beginning-of-next-line-or-eol(current-point)
-  "Starting from the current point, returns the point on the start of the next line, or 
-if there is no next line, the point at end of line."
+  "Starting from the current point, returns the point on the start of
+the next line, or if there is no next line, the point at end of line."
   (save-excursion
     (goto-char current-point)
     (if (eobp)
@@ -420,10 +451,11 @@ if there is no next line, the point at end of line."
 
 
 (defun moin--list-get-subtree-end-point (list-item-info)
-  "Determin the end-point of the subtree of the given list-item-info, i.e.
-the point where the last child subitem of the given item ends. Even that is
-not fully correct - we return the point on the beginning of the next line 
-after the last child, if there is a next line, otherwise the point at eol."
+  "Determin the end-point of the subtree of the given list-item-info,
+i.e. the point where the last child subitem of the given item ends.
+Even that is not fully correct - we return the point on the beginning
+of the next line after the last child, if there is a next line,
+otherwise the point at eol."
   (let (next-list-item-info
 	subtree-end-point)
     
@@ -458,10 +490,10 @@ after the last child, if there is a next line, otherwise the point at eol."
     subtree-end-point))
 
 
-(defun moin--list-move-subtree-up (&optional arg)
-  "See `moin-command-meta-shift-up' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list."
+(defun moin--list-move-subtree-up ()
+  "See `moin-command-meta-shift-up' for more information. Expects to
+actually be in a list as prerequisite. Never call this function if
+point is currently not in a list."
   (let (current-list-item-info
 	current-item-level
 	current-item-start-point
@@ -506,15 +538,16 @@ function if point is currently not in a list."
     (goto-char (+ previous-item-start-point relative-point))))
 
 
-(defun moin--list-move-subtree-down (&optional arg)
-  "See `moin-command-meta-shift-down' for more information.
-Expects to actually be in a list as prerequisite. Never call this 
-function if point is currently not in a list.
+(defun moin--list-move-subtree-down ()
+  "See `moin-command-meta-shift-down' for more information. Expects to
+actually be in a list as prerequisite. Never call this function if
+point is currently not in a list.
 
-Implementation idea: Go to the point after current list item's subtree. 
-If there is no follow-up item on the same level, throw an error. Otherwise
-move the next item up, reusing `moin--list-move-subtree-up'. Then position
-point such that it is at the same place relative to the item start."
+Implementation idea: Go to the point after current list item's
+subtree. If there is no follow-up item on the same level, throw an
+error. Otherwise move the next item up, reusing
+`moin--list-move-subtree-up'. Then position point such that it is at
+the same place relative to the item start."
   (let (list-item-info
   	current-item-level
   	current-item-start-point
@@ -541,7 +574,7 @@ point such that it is at the same place relative to the item start."
 	    (not (eq next-item-level current-item-level)))
 	(user-error "Cannot move subtree down, it is already the last item in the subtree with the same level"))
     
-    (moin--list-move-subtree-up arg)
+    (moin--list-move-subtree-up)
     
     (setq list-item-info (moin--list-get-item-info))
     (setq subtree-end-point (moin--list-get-subtree-end-point list-item-info))

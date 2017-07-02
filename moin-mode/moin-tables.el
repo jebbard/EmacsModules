@@ -24,7 +24,7 @@
 
 ;; Table support for moin mode
 
-;;; Code
+;;; Code:
 
 
 ;; Required for string trimming functions (since Emacs 24.4)
@@ -64,43 +64,44 @@
 
 (defun moin--table-goto-previous-row ()
   "Tries to move to the beginning of the previous table row, if any.
-Returns t if there is a previous line that is a table row, nil otherwise.
-If there is a previous line, it remains there, even if it might not be 
-a table row."
+Returns t if there is a previous line that is a table row, nil
+otherwise. If there is a previous line, it remains there, even if it
+might not be a table row."
   (beginning-of-line)
   (if (bobp)
       nil
     (progn
-      (previous-line)
+      (forward-line -1)
       (moin-is-in-table-p))))
 
 
 (defun moin--table-goto-next-row ()
-  "Tries to move to the end of the next table row, if any.
-Returns t if there is a next line that is a table row, nil otherwise.
-If there is a next line, it remains there, even if it might not be 
-a table row."
+  "Tries to move to the end of the next table row, if any. Returns t
+if there is a next line that is a table row, nil otherwise. If there
+is a next line, it remains there, even if it might not be a table
+row."
   (end-of-line)
   (if (eobp)
       nil
     (progn
-      (next-line)
+      (forward-line)
       (moin-is-in-table-p))))
 
 
 (defun moin--table-next-row (mode)
-  "See `moin-command-table-next-row' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table.
-The parameter mode is a string and can have the values:
-* 'BASIC': Just go to the next row, create one if necessary,
-realign original and target field
-* 'COPY': Copy down content of the current field to the next row, create one
- if necessary, override content already present in the target field if necessary,
-realign original and target field
-* 'SPLIT': Split content of the current field to the next row, create one
- if necessary, prepend content already present in the target field if necessary,
-realign original and target field."
+  "See `moin-command-table-next-row' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table. The parameter MODE is a string and
+can have the values:
+* BASIC: Just go to the next row, create one, if necessary,
+  realign original and target field
+* COPY: Copy down content of the current field to the next row, create
+  one, if necessary, override content already present in the target
+  field if necessary, realign original and target field
+* SPLIT: Split content of the current field to the next row, create
+  one if necessary, prepend content already present in the target
+  field with the text split from the previous field, if necessary,
+  realign original and target field."
   (let
       (initial-point
        current-row-column-details
@@ -154,11 +155,11 @@ realign original and target field."
 
         (if (eobp)
   	    (newline)
-  	  (next-line))
+  	  (forward-line))
 
   	(if (not (moin-is-in-table-p))
   	    (progn
-  	      (previous-line)
+  	      (forward-line -1)
   	      (moin--table-insert-row nil)))
 
 	;; Determine details of next row and next field
@@ -183,9 +184,9 @@ realign original and target field."
 	(goto-char (+ next-field-start-point 1))))))
 
 
-(defun moin--table-previous-field (&optional arg)
+(defun moin--table-previous-field ()
   "See `moin-command-table-previous-field' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
+Expects to actually be in a table as prerequisite. Never call this
 function if point is currently not in a table."
     (let
       (column-details
@@ -234,10 +235,10 @@ function if point is currently not in a table."
     (goto-char (+ previous-start-point 1))))
 
 
-(defun moin--table-next-field (&optional arg)
-  "See `moin-command-tab' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-next-field ()
+  "See `moin-command-tab' for more information. Expects to actually be
+in a table as prerequisite. Never call this function if point is
+currently not in a table."
   (let
       (column-details
        next-column-details
@@ -273,11 +274,11 @@ function if point is currently not in a table."
 		
 		(if (eobp)
 		    (newline)
-		  (next-line))
+		  (forward-line))
 
 		(if (not (moin-is-in-table-p))
 		    (progn
-		      (previous-line)
+		      (forward-line -1)
 		      (moin--table-insert-row nil)))
 
 		(setq next-column-details (moin--table-determine-column-details))
@@ -291,12 +292,13 @@ function if point is currently not in a table."
 
 
 (defun moin--table-fix-field (field-info &optional new-field-text)
-  "Fixes the content of a field by ensuring it starts and ends with a single
-blank. Expects a field-info list with start-point of field as first element,
-end-point of field as second and field-text as third element. If a new-field-text
-is given, the old field-text is replaced by the new-field-text, and ensuring single 
-blanks at start end end as described. After this function, point will be at
-the end of the field text, i.e. after the padding blank."
+  "Fixes the content of a field by ensuring it starts and ends with a
+single blank. Expects a FIELD-INFO list with start-point of field as
+first element, end-point of field as second and field-text as third
+element. If a NEW-FIELD-TEXT is given, the old field-text is replaced
+by the new-field-text, ensuring single blanks at start and end as
+described. After this function, point will be at the end of the field
+text, i.e. after the padding blank."
   (let ((start-point (car field-info))
     (end-point (car (cdr field-info)))
     (field-text (car (cdr (cdr field-info)))))
@@ -312,15 +314,19 @@ the end of the field text, i.e. after the padding blank."
 
 
 (defun moin--table-do-swap (leftmost-column-info rightmost-column-info)
-  "Performs actual table swapping by replacing strings belonging to different
-table columns in the current row."
-  (setq leftmost-text (car (cdr (cdr leftmost-column-info))))
-  (setq leftmost-start-point (car leftmost-column-info))
-  (setq leftmost-end-point (car (cdr leftmost-column-info)))
-  
-  (setq rightmost-text (car (cdr (cdr rightmost-column-info))))
-  (setq rightmost-start-point (car rightmost-column-info))
-  (setq rightmost-end-point (car (cdr rightmost-column-info)))
+  "Performs actual table swapping by replacing strings belonging to
+different table columns in the current row. Specifically, it swaps the
+column identified by LEFTMOST-COLUMN-INFO with the column identified
+by RIGHTMOST-COLUMN-INFO."
+  (let ((leftmost-text (car (cdr (cdr leftmost-column-info))))
+	(leftmost-start-point (car leftmost-column-info))
+	(leftmost-end-point (car (cdr leftmost-column-info)))
+	(rightmost-text (car (cdr (cdr rightmost-column-info))))
+	(rightmost-start-point (car rightmost-column-info))
+	(rightmost-end-point (car (cdr rightmost-column-info)))
+	text-between-columns
+	string-to-replace
+	replacement-string)
   
   (setq text-between-columns
 	(buffer-substring-no-properties leftmost-end-point rightmost-start-point))
@@ -335,13 +341,15 @@ table columns in the current row."
   
   (if (search-forward string-to-replace rightmost-end-point t)
       (replace-match replacement-string t t)
-    (user-error "Illegal state - did not find buffer string to replace, terminating function")))
+    (user-error "Illegal state - did not find buffer string to replace, terminating function"))))
 
 
 (defun moin--table-swap-columns(current-row-column-details current-table-column swap-left)
-  "Swaps the current-table-column of a moin table with its next - if swap-left is non-nil - or next
- - if swap-left is nil - column. If there is no such column, throws an error. The details of the 
-current row must be determined before and passes in the parameter current-row-column-details."
+  "Swaps the CURRENT-TABLE-COLUMN of a moin table with its previous
+ column - if SWAP-LEFT is non-nil - or next column - if SWAP-LEFT is
+ nil. If there is no such column, throws an error. The details of the
+ current row must be determined before and passed in the parameter
+ CURRENT-ROW-COLUMN-DETAILS."
   (let (current-column-info
 	current-column-text
 	current-column-start-point
@@ -379,12 +387,14 @@ current row must be determined before and passes in the parameter current-row-co
 
 
 (defun moin--table-execute-function-per-row (function &optional args)
-  "Executes a functin for each row of the current table. This function assumes that it is 
-already in a table. It gets the current-row-column-details, and executes the given function
-first for the current row, then for all previous rows (if any), and finally for all upcoming
-table rows (if any). The function must take the current-row-column-details as first and 
-the current-table-column as second argument. It can take arbitrary additional args that
-can be passed to this function."
+  "Executes a FUNCTION for each row of the current table. This
+function assumes that it is already in a table. It gets the
+current-row-column-details, and executes the given function first for
+the current row, then for all previous rows (if any), and finally for
+all upcoming table rows (if any). The function must take the
+current-row-column-details as first and the current-table-column as
+second argument. It can take arbitrary additional ARGS that can be
+passed to this function."
   (let (current-row-column-details current-table-column	column-count)
 
     (setq column-count (- (length current-row-column-details) 1))
@@ -417,8 +427,9 @@ can be passed to this function."
 
 
 (defun moin--table-check-row (current-row-column-details current-table-column)
-  "Checks the current table row for having at least current-table-column columns.
-If that is not the case, it throws a corresponding error."
+  "Checks the current table row identified by
+CURRENT-ROW-COLUMN-DETAILS for having at least CURRENT-TABLE-COLUMN
+columns. If that is not the case, it throws a corresponding error."
   (let (column-count)
     (setq column-count (- (length current-row-column-details) 1))
     
@@ -427,9 +438,11 @@ If that is not the case, it throws a corresponding error."
 
 
 (defun moin--table-do-remove-column (current-row-column-details current-table-column &optional arg)
-  "Performs actual removal of the current-table-column, based on the information contained in
-current-row-column-details. The last argument is just a dummy never used, it is just needed such
-that `moin--table-execute-function-per-row' can be used to trigger this function."
+  "Based on the information contained in CURRENT-ROW-COLUMN-DETAILS,
+this function performs actual removal of the CURRENT-TABLE-COLUMN, .
+The last argument ARG is just a dummy never used, it is just needed
+such that `moin--table-execute-function-per-row' can be used to
+trigger this function."
   (let (current-column-info
 	current-column-start-point
 	current-column-end-point
@@ -446,14 +459,14 @@ that `moin--table-execute-function-per-row' can be used to trigger this function
 
     (goto-char current-column-start-point)
 
-    (delete-forward-char
+    (delete-char
      (- (+ current-column-end-point (length moin-const-table-delimiter)) current-column-start-point) nil)
 
     ;; Special case that the current table has just the single column to remove
     (if (eq 1 column-count)
 	(progn
 	  (beginning-of-line)
-	  (delete-forward-char (length moin-const-table-delimiter) nil))
+	  (delete-char (length moin-const-table-delimiter) nil))
       ;; Special case: Current column is the last (but not the only) column in the table,
       ;; Goto the beginning of the previous table column in that special case
       (if (eq current-table-column column-count)
@@ -464,10 +477,12 @@ that `moin--table-execute-function-per-row' can be used to trigger this function
 
 
 (defun moin--table-do-insert-column (current-row-column-details current-table-column &optional arg)
-  "Performs actual insertion of a new column in fromt of the current-table-column,
-based on the information contained in current-row-column-details. The last argument
-is just a dummy never used, it is just needed such that `moin--table-execute-function-per-row'
-can be used to trigger this function."
+  "Based on the information contained in CURRENT-ROW-COLUMN-DETAILS,
+performs actual insertion of a new column in front of the
+CURRENT-TABLE-COLUMN. The last argument ARG is just a dummy never
+used, it is just needed such that
+`moin--table-execute-function-per-row' can be used to trigger this
+function."
   (let (current-column-info
 	current-column-start-point)
 
@@ -483,38 +498,38 @@ can be used to trigger this function."
     (backward-char)))
 
 
-(defun moin--table-move-column-right (&optional arg)
-  "See `moin-command-meta-right' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-move-column-right ()
+  "See `moin-command-meta-right' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table."
   (moin--table-execute-function-per-row 'moin--table-swap-columns nil))
 
 
-(defun moin--table-move-column-left (&optional arg)
-  "See `moin-command-meta-left' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-move-column-left ()
+  "See `moin-command-meta-left' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table."
   (moin--table-execute-function-per-row 'moin--table-swap-columns t))
 
 
-(defun moin--table-insert-column (&optional arg)
-  "See `moin-command-meta-shift-right' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-insert-column ()
+  "See `moin-command-meta-shift-right' for more information. Expects
+to actually be in a table as prerequisite. Never call this function if
+point is currently not in a table."
   (moin--table-execute-function-per-row 'moin--table-do-insert-column nil))
 
 
-(defun moin--table-remove-column (&optional arg)
-  "See `moin-command-meta-shift-left' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-remove-column ()
+  "See `moin-command-meta-shift-left' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table."
   (moin--table-execute-function-per-row 'moin--table-do-remove-column nil))
 
 
-(defun moin--table-move-row-down (&optional arg)
-  "See `moin-command-meta-down' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-move-row-down ()
+  "See `moin-command-meta-down' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table."
   (let (current-column)
 
     (save-excursion
@@ -524,18 +539,18 @@ function if point is currently not in a table."
     
     (setq current-column (current-column))
 
-    (next-line)
+    (forward-line)
     (transpose-lines 1)
 
-    (previous-line)
+    (forward-line -1)
 
     (move-to-column current-column)))
 
 
-(defun moin--table-move-row-up (&optional arg)
-  "See `moin-command-meta-up' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-move-row-up ()
+  "See `moin-command-meta-up' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table."
   (let (current-column)
 
     (save-excursion
@@ -547,18 +562,18 @@ function if point is currently not in a table."
 
     (transpose-lines 1)
 
-    (previous-line 2)
+    (forward-line -2)
 
     (move-to-column current-column)))
 
 
 (defun moin--table-insert-row (insert-before-p)
-  "See `moin-command-meta-shift-down' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table. If insert-before-p is
-t, the new row is inserted before the current row, otherwise it is
-inserted after the current row. In any case, it inserts a row with
-the same number of columns as the current row."
+  "See `moin-command-meta-shift-down' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table. If INSERT-BEFORE-P is t, the new
+row is inserted before the current row, otherwise it is inserted after
+the current row. In any case, it inserts a row with the same number of
+columns as the current row."
   (let
       (column-details column-count)
 
@@ -569,7 +584,7 @@ the same number of columns as the current row."
 	(progn
 	  (beginning-of-line)
 	  (newline)
-	  (previous-line))
+	  (forward-line -1))
       (progn
 	(end-of-line)
 	(newline)))
@@ -582,10 +597,10 @@ the same number of columns as the current row."
     (move-to-column 3)))
 
 
-(defun moin--table-remove-row (&optional arg)
-  "See `moin-command-meta-shift-up' for more information.
-Expects to actually be in a table as prerequisite. Never call this 
-function if point is currently not in a table."
+(defun moin--table-remove-row ()
+  "See `moin-command-meta-shift-up' for more information. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table."
   (let (current-column
 	chars-to-delete
 	del-start-point
@@ -599,18 +614,18 @@ function if point is currently not in a table."
     (if (eobp)
 	(setq del-end-point (point-at-eol))
       (progn
-	(next-line)
+	(forward-line)
 	(beginning-of-line)
 	(setq del-end-point (point-at-bol))))
 
     (goto-char del-start-point)
-    (delete-forward-char (- del-end-point del-start-point))
+    (delete-char (- del-end-point del-start-point))
 
     (if (and (not (moin-is-in-table-p)) (not (bobp)))
 	(progn
-	  (previous-line)
+	  (forward-line -1)
 	  (if (not (moin-is-in-table-p))
-	      (next-line))))
+	      (forward-line))))
 
     (if (>= (- (point-at-eol) (point-at-bol)) current-column)
 	(move-to-column current-column)
@@ -618,25 +633,30 @@ function if point is currently not in a table."
 
 
 (defun moin--table-determine-column-details ()
-  "Determines the column details of the current row. Expects to actually 
-be in a table as prerequisite. Never call this function if point is 
-currently not in a table.
+  "Determines the column details of the current row. Expects to
+actually be in a table as prerequisite. Never call this function if
+point is currently not in a table.
 
-The column details are presented in a list containing the following
-* The first element is the current table column, i.e. the 1-based logical
-column index in the current row where point is currently in, which then can
-also be used as index on this entire returned list for getting the current
-column details. In the special case that point is located before the first
-column content starts, the current-column is nevertheless set to 1. If point
-is in between the two delimiters '||' of the moin table, it is seen to be
-still located in previous column. In case point is at the end of line, it is 
-considered to be in the last column.
-* All other entries have the form (start-point end-point content) where 'start-point' is 
-an integer with the buffer's point value of the first character directly after
-'||', i.e. where the column content begins, 'end-point' is an integer with the buffer's 
-point value after the last character directly before '||', i.e. where the column ends,
-and 'content' is the actual string content of the column, including any enclosing
-whitespace, but without the column delimiters '||'."
+The column details are retruned as a list containing the following
+elements:
+* The first element is the current table column, i.e. the 1-based
+logical column index in the current row where point is currently in,
+which then can also be used as index on this entire returned list for
+getting the current column details. In the special case that point is
+located before the first column content starts, the current column is
+nevertheless set to 1. If point is in between the two delimiters of
+`moin-const-table-delimiter' of the moin table, it is seen to be still
+located in the previous column. In case point is at the end of line,
+it is considered to be in the last column.
+* All other entries have the form (start-point end-point content)
+where 'start-point' is an integer with the buffer's point value of the
+first character directly after `moin-const-table-delimiter', i.e.
+where the column content begins, 'end-point' is an integer with the
+buffer's point value after the last character directly before
+`moin-const-table-delimiter', i.e. where the column ends, and
+'content' is the actual string content of the column, including any
+enclosing whitespace, but without the column delimiters
+`moin-const-table-delimiter'."
   (interactive)
   (let
       ((column-regex (concat moin-const-quoted-table-delimiter
@@ -681,8 +701,8 @@ whitespace, but without the column delimiters '||'."
 
 
 (defun moin--table-create (table-size-string)
-  "Creates a new table with the given table-size-string. If the string is 
-malformed, it throws a user-error."
+  "Creates a new table with the given TABLE-SIZE-STRING. If the string
+is malformed, it throws a user error."
   (let
       ((error-message (concat
 		       "Invalid table size format specified, should be Columns x Rows [e.g. "
@@ -703,7 +723,7 @@ malformed, it throws a user-error."
     (if (bolp)
 	(progn
 	  (newline)
-	  (previous-line))
+	  (forward-line -1))
       (progn
 	(end-of-line)
 	(newline)

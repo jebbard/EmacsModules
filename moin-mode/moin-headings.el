@@ -24,13 +24,15 @@
 
 ;; Heading support for moin mode
 
-;;; Code
+;;; Code:
+
+(require 'outline)
 
 ;; ==================================================
 ;; Constants
 
 (defconst moin-const-max-heading-level 5
-  "The maximum level of a heading in MoinMoin")
+  "The maximum level of a heading in MoinMoin.")
 
 
 ;; ==================================================
@@ -47,17 +49,19 @@
 ;; "Private" Functions
 
 (defun moin--heading-determine-content ()
-  "Gets the content of the current heading without any prefix or suffix"
+  "Gets the content of the current heading without any prefix or
+suffix."
   (save-excursion
     (beginning-of-line)
     (looking-at "=*? \\(.*\\) .*?\\(=\\|$\\)")
-    (setq heading-content (match-string 1))))
+    (match-string 1)))
 
 
 (defun moin--heading-fix (updated-heading-level)
-  "Update and fix the prefix and suffix of a heading, essentially replaces
-any combinations of blanks and '=' at the end or beginning of current line
-with a well-formed heading suffix of the given level."
+  "Update and fix the prefix and suffix of a heading, essentially
+replaces any combinations of blanks and '=' at the end or beginning of
+current line with a well-formed heading suffix of the given
+UPDATED-HEADING-LEVEL."
   (let
       ((heading-pre-suf (make-string updated-heading-level ?=)))
     (beginning-of-line)
@@ -70,8 +74,8 @@ with a well-formed heading suffix of the given level."
 
 
 (defun moin--heading-determine-level ()
-  "Determines the level of the current heading, if any. Returns 0 if currently not
-on a heading"
+  "Determines the level of the current heading, if any. Returns 0 if
+currently not on a heading"
   (let (len)
     (save-excursion
       (beginning-of-line)
@@ -81,8 +85,8 @@ on a heading"
 
 
 (defun moin--heading-determine-section-level()
-  "Tries to determine the heading level of the current section where point 
-is in. If there is no previous heading, it throws an error."
+  "Tries to determine the heading level of the current section where
+point is in. If there is no previous heading, it throws an error."
   (let (section-level)
     (save-excursion
       (setq section-level (condition-case nil
@@ -93,15 +97,15 @@ is in. If there is no previous heading, it throws an error."
 
 
 (defun moin--determine-heading-folding-state ()
-  "Determins the state of folding of the current heading. This function assumes
-that the point is currently on a heading line. 
-The states are:
+  "Determins the state of folding of the current heading. This
+function assumes that the point is currently on a heading line. The
+states are:
  * FOLDED: Hides the entire subtree and content of the current heading
- * CHILDREN: Shows the content of the current heading and all direct child 
-headings of the next lower level below the current heading. The child heading
-subtrees remain hidden.
- * SUBTREE: The entire content and subtree below the current heading is 
-shown entirely, no folding"
+ * CHILDREN: Shows the content of the current heading and all direct
+   child headings of the next lower level below the current heading.
+   The child heading subtrees remain hidden.
+ * SUBTREE: The entire content and subtree below the current heading
+   is shown entirely, no folding"
   (let (current-heading-level
 	next-heading-level
 	(is-child-heading t)
@@ -140,9 +144,9 @@ shown entirely, no folding"
 
 (defun moin--heading-move-subtree-up-or-down (arg)
   "Move the current subtree up or down past ARG headlines of the same level.
-This is a bugfix version of outline-move-subtree-down copied from
+This is a bugfix version of `outline-move-subtree-down' copied from
 Emacs 25.1, slightly adapted. See GNU Emacs bug#19102. Only uses the 
-bugfix code if emacs major version is < 25."
+bugfix code if Emacs major version is < 25."
   (interactive "p")
   (let ((current-column (current-column)))
     
@@ -183,15 +187,22 @@ bugfix code if emacs major version is < 25."
 	    (if folded (hide-subtree))
 	    (move-marker ins-point nil)))
       ;; else if emacs major version >= 25
-      (outline-move-subtree-dowh arg))
+      (outline-move-subtree-down arg))
 
     (move-to-column current-column)))
 
 
-(defun moin--heading-execute-action-on-subtree (action &optional initial-level curr-level)
-  "Executes a given action on the whole subtree of the current heading, including the current
-heading itself. The function sets point to the start of each of the headings belonging to the
-subtree of the current heading. Must be called only if point is currently on a heading."
+(defun moin--heading-execute-action-on-subtree (action &optional parent-level curr-level)
+  "Executes a given ACTION on the whole subtree of the current parent
+heading (with PARENT-LEVEL), including the current parent heading
+itself. The parameter CURR-LEVEL tracks the current level of the
+subtree to ensure the recursive call can be terminated. The
+PARENT-LEVEL is always keeping the level of the heading where this
+function was first called. When initially calling this method, these
+two parameters can be nil, in which case they are explicitly
+determined within this function. The function sets point to the start
+of each of the headings belonging to the subtree of the current
+heading. Must be called only if point is currently on a heading."
   (let (current-heading-level
 	next-heading-level
 	current-point)
@@ -206,8 +217,8 @@ subtree of the current heading. Must be called only if point is currently on a h
 	  (setq current-heading-level (moin--heading-determine-level))
 	(setq current-heading-level curr-level))
 
-      (if (not initial-level)
-	  (setq initial-level current-heading-level))
+      (if (not parent-level)
+	  (setq parent-level current-heading-level))
       
       (funcall action current-heading-level)
 
@@ -227,13 +238,14 @@ subtree of the current heading. Must be called only if point is currently on a h
 	      (setq next-heading-level 0))
 
 	    ;; Real child found
-	    (if (> next-heading-level initial-level)
+	    (if (> next-heading-level parent-level)
 		(progn
-		  (moin--heading-execute-action-on-subtree action initial-level next-heading-level))))))))
+		  (moin--heading-execute-action-on-subtree action parent-level next-heading-level))))))))
 
 
 (defun moin--heading-do-demote(current-level)
-  "Performs actual demotion of the current heading"
+  "Performs actual demotion of the current heading which has
+CURRENT-LEVEL."
   (if (= current-level moin-const-max-heading-level)
       (user-error "Cannot demote heading '%s', because it is already on maximum level %s"
 		  (moin--heading-determine-content) moin-const-max-heading-level)
@@ -243,7 +255,8 @@ subtree of the current heading. Must be called only if point is currently on a h
 
 
 (defun moin--heading-do-promote(current-level)
-  "Performs actual promotion of the current heading"
+  "Performs actual promotion of the current heading which has
+CURRENT-LEVEL"
   (if (= current-level 1)
       (user-error "Cannot promote heading '%s', because it is already on minimum level 1"
 		  (moin--heading-determine-content))
@@ -253,12 +266,16 @@ subtree of the current heading. Must be called only if point is currently on a h
 
 
 (defun moin--heading-change-level (change-func including-subtree column-change)
-  "Promotes or demotes the current heading (depending on the change-func provided), 
-either with or without subtree. This function was created to also take care of the 
-special characteristics of MoinMoin headings: They are enclosed by '=' signs. 
-Unfortunately, outline-mode does not support this, i.e. it only demotes the 
-prefix of the heading, leaving the suffix unchanged. Thus, moin-mode itself needs 
-to take care of also demoting or promoting the rest of the heading."
+  "Promotes or demotes the current heading (depending on the
+CHANGE-FUNC provided), either with or without subtree, depending on
+the value of INCLUDING-SUBTREE. Callers indicated with the integer
+passes as COLUMN-CHANGE where to move (relative to the current column)
+after executing this function. This function was created to also take
+care of the special characteristics of MoinMoin headings: They are
+enclosed by '=' signs. Unfortunately, `outline-mode' does not support
+this, i.e. it only demotes the prefix of the heading, leaving the
+suffix unchanged. Thus, moin-mode itself needs to take care of also
+demoting or promoting the rest of the heading."
   (let (current-heading-level current-column)
 
     (save-excursion
@@ -279,9 +296,8 @@ to take care of also demoting or promoting the rest of the heading."
 	  (beginning-of-line)))))
 
 
-(defun moin--heading-outline-cycle (&optional arg)
+(defun moin--heading-outline-cycle ()
   "Implements outline cycle, see `' for more details."
-  (interactive "p")
   (let (folding-state)
     (if (moin-is-on-heading-p)
 	(progn
@@ -300,21 +316,21 @@ to take care of also demoting or promoting the rest of the heading."
 
 
 (defun moin--heading-create (level &optional text)
-  "Creates a new heading at the current point and positions point
-after the heading prefix"
+  "Creates a new heading with the given LEVEL with the given TEXT, at
+the current point and moves point after the heading prefix."
   (beginning-of-line)
   (insert (make-string level ?=))
   (insert "  ")
   (insert (make-string level ?=))
   (newline)
-  (previous-line)
+  (forward-line -1)
   (move-to-column (+ level 1))
   (if text
       (insert text)))
 
 
-(defun moin--heading-insert (&optional arg)
-  "Inserts a new heading before or behind the current one, see 
+(defun moin--heading-insert ()
+  "Inserts a new heading before or behind the current one, see
 `moin-command-meta-return' for details."
   (let (current-heading-level new-heading-text)
     
@@ -350,7 +366,7 @@ after the heading prefix"
 	(moin--heading-create current-heading-level)))))
 
 
-(defun moin--heading-insert-respect-content (&optional arg)
+(defun moin--heading-insert-respect-content ()
   "See `moin-command-insert-heading-respect-content' for details."
   (let (current-heading-level
 	next-heading-level
@@ -369,7 +385,7 @@ after the heading prefix"
 	      (setq current-heading-level (moin--heading-determine-level))
 	    (progn
 	      (setq current-heading-level 1)
-	      (end-of-buffer)
+	      (goto-char (point-max))
 	      (if (not (looking-at "^$"))
 		  (newline))))
 	  (moin--heading-create current-heading-level))
@@ -412,7 +428,7 @@ after the heading prefix"
 		    (not (moin-is-on-heading-p))
 		    (and (moin-is-on-heading-p) (eq initial-point (point))))
 		(progn
-		  (end-of-buffer)
+		  (goto-char (point-max))
 		  (if (not (looking-at "^$"))
 		      (newline))))
 	    

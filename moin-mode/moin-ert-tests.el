@@ -128,7 +128,11 @@ the expected-error-type to be thrown."
 	  (set-mark-command nil)
 	  (forward-char region-size)))
     
-    (should-error (funcall func args) :type expected-error-type)))
+    (should-error
+     (if args
+	 (funcall func args)
+       (funcall func))
+     :type expected-error-type)))
 
 
 ;; ==================================================
@@ -895,34 +899,20 @@ Expectations are given in the list form (current-column (start-point end-point c
 (ert-deftest test-moin--table-insert-row ()
   "Tests `moin--table-insert-row'"
   ;; Inserting rows behind current row
-  (test-moin--check-table-insert-row "|| ||" 1 'moin--table-insert-row nil "||  ||")
-  (test-moin--check-table-insert-row "||||aaa ||" 9 'moin--table-insert-row nil "||  ||  ||")
-  (test-moin--check-table-insert-row "||a||b||c||d||     e ||" 22 'moin--table-insert-row nil "||  ||  ||  ||  ||  ||")
+  (check-func-at-point 'moin--table-insert-row "|| ||" 1 4 "||  ||\n|| ||" 0 (list nil))
+  (check-func-at-point 'moin--table-insert-row "||||aaa ||" 9 4 "||  ||  ||\n||||aaa ||" 0 (list nil))
+  (check-func-at-point 'moin--table-insert-row "||a||b||c||d||     e ||" 22 4
+		       "||  ||  ||  ||  ||  ||\n||a||b||c||d||     e ||" 0 (list nil))
   ;; Inserting rows before current row (direct call)
-  (test-moin--check-table-insert-row "|| ||" 1 'moin--table-insert-row t "||  ||")
-  (test-moin--check-table-insert-row "||||aaa ||" 9 'moin--table-insert-row t "||  ||  ||")
-  (test-moin--check-table-insert-row "||a||b||c||d||     e ||" 22 'moin--table-insert-row t "||  ||  ||  ||  ||  ||")
+  (check-func-at-point 'moin--table-insert-row "|| ||" 1 4 "||  ||\n|| ||" 0 t)
+  (check-func-at-point 'moin--table-insert-row "||||aaa ||" 9 4 "||  ||  ||\n||||aaa ||" 0 t)
+  (check-func-at-point 'moin--table-insert-row "||a||b||c||d||     e ||" 22 4
+		       "||  ||  ||  ||  ||  ||\n||a||b||c||d||     e ||" 0 t)
   ;; Inserting rows before current row (command call)
-  (test-moin--check-table-insert-row "|| ||" 1 'moin-command-meta-shift-down t "||  ||")
-  (test-moin--check-table-insert-row "||||aaa ||" 9 'moin-command-meta-shift-down t "||  ||  ||")
-  (test-moin--check-table-insert-row "||a||b||c||d||     e ||" 22 'moin-command-meta-shift-down t "||  ||  ||  ||  ||  ||"))
-
-
-(defun test-moin--check-table-insert-row (text start-point func insert-before-p expected-new-row)
-  (with-temp-buffer
-    (moin-mode)
-    (insert text)
-    (goto-char start-point)
-    (funcall func insert-before-p)
-    (message "test-moin--check-table-insert-row buffer string after funcall: %s" (buffer-string))
-
-    (if insert-before-p
-	(progn
-	  (should (equal (concat expected-new-row "\n" text) (buffer-string)))
-	  (should (equal 4 (point))))
-      (progn
-	(should (equal (concat text "\n" expected-new-row) (buffer-string)))
-	(should (equal (+ (length text) 5) (point)))))))
+  (check-func-at-point 'moin-command-meta-shift-down "|| ||" 1 4 "||  ||\n|| ||")
+  (check-func-at-point 'moin-command-meta-shift-down "||||aaa ||" 9 4 "||  ||  ||\n||||aaa ||")
+  (check-func-at-point 'moin-command-meta-shift-down "||a||b||c||d||     e ||" 22 4
+		       "||  ||  ||  ||  ||  ||\n||a||b||c||d||     e ||"))
 
 
 (ert-deftest test-moin--table-remove-row ()
