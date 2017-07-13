@@ -140,6 +140,10 @@ can have the values:
 	(setq next-field-text-override next-field-text)
 	
 	(cond ((string= mode "SPLIT")
+	       (if (< initial-point current-field-start-point)
+		   (setq initial-point current-field-start-point)
+		 (if (> initial-point current-field-end-point)
+		     (setq initial-point current-field-end-point)))
 	       (setq current-field-text-override
 		     (buffer-substring-no-properties current-field-start-point initial-point))
 	       (setq next-field-text-override

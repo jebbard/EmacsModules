@@ -73,10 +73,10 @@ of tables, set to nil otherwise. Default is t"
 ; ------
 ; Highlighting Formatted Text
 ; -------
-(defface moin-face-bold '((t (:weight bold)))
+(defface moin-face-bold '((t (:foreground "LightSkyBlue" :height 1.4 :weight bold)))
   "Face name to use for bold text in moinmoin"
   :group 'moin-faces)
-(defface moin-face-italic '((t (:slant italic)))
+(defface moin-face-italic '((t (:foreground "Orange" :height 0.7 :slant italic)))
   "Face name to use for italic text in moinmoin"
   :group 'moin-faces)
 (defface moin-face-underline '((t (:underline t)))
@@ -283,139 +283,160 @@ color could not be identified (e.g. during typing)."
   (make-local-variable 'font-lock-extra-managed-props)
   (add-to-list 'font-lock-extra-managed-props 'display)
   (font-lock-add-keywords nil `(
-     ; ------
-     ; Highlighting Formatted Text
-     ; -------
-     ;; Bold
-     ("\\('''.*?'''\\)"
-      (1 'moin-face-bold prepend))
-     ;; Italic
-     ("[^']\\(''[^']*?''\\)[^']"
-      (1 'moin-face-italic prepend))
-     ;; Underline
-     ("\\(__.*?__\\)"
-      (1 'moin-face-underline prepend))
-     ;; Strikethrough
-     ("\\(--(.*?)--\\)"
-      (1 'moin-face-stroke prepend))
-     ;; Subscript
-     ("\\(,,.*?,,\\)"
-      (1 (list 'face 'moin-face-subscript 'display '(raise -0.3)) prepend))
-     ;; Superscript
-     ("\\(\\^.*?\\^\\)"
-      (1 (list 'face 'moin-face-superscript 'display '(raise 0.3)) prepend))
-     ;; Monospace
-     ("\\(`.*?`\\)"
-      (1 'moin-face-monospace prepend))
-     ;; Larger
-     ("\\(~\\+.*?\\+~\\)"
-      (1 'moin-face-larger prepend))
-     ;; Smaller
-     ("\\(~-.*?-~\\)"
-      (1 'moin-face-smaller prepend))
-
-     ; ------
-     ; Highlighting Tables
-     ; -------
-     ;; Table content until next separator
-     ("\\(.*?\\)\\(||\\)"
-      (1 'moin-face-table-content prepend)
-      (2 'moin-face-table-separator))
-     ;; Table processing instruction
-     ("||\\(<.*?>\\)"
-      (1 'moin-face-table-processing-instruction prepend))
-     ;; Table with color spec
-     ("^||<rowbgcolor=\"\\(.*?\\)\">.*$"
-      (0 (when moin-highlight-colored-table-p (moin--create-dynamic-bg-face (match-string 1))) prepend))
-
-     ; ------
-     ; Highlighting Macros
-     ; -------
-     ;; Macro
-     ("\\(<<\\)\\(.*?\\)\\(>>\\)"
-      (1 'moin-face-macro-braces)
-      (2 'moin-face-macro-content prepend)
-      (3 'moin-face-macro-braces))
-
-     ; ------
-     ; Highlighting Embeddings (e.g. Attachment)
-     ; -------
-     ;; Embedding
-     ("\\([^{]{{\\)\\([^{].*?[^}]\\)\\(}}[^}]\\)"
-      (1 'moin-face-embedding-braces)
-      (2 'moin-face-embedding-content prepend)
-      (3 'moin-face-embedding-braces))
     
      ; ------
      ; Highlighting Headings
      ; -------
      ("^\\(= .* =\\)$"
-      (1 'moin-face-h1 t))
+      (1 'moin-face-h1 append))
      ("^\\(== .* ==\\)$"
-      (1 'moin-face-h2 t))
+      (1 'moin-face-h2 append))
      ("^\\(=== .* ===\\)$"
-      (1 'moin-face-h3 t))
+      (1 'moin-face-h3 append))
      ("^\\(==== .* ====\\)$"
-      (1 'moin-face-h4 t))
+      (1 'moin-face-h4 append))
      ("^\\(===== .* =====\\)$"
-      (1 'moin-face-h5 t))
-    
+      (1 'moin-face-h5 append))
+     
      ; ------
      ; Highlighting Environments
      ; -------
+     ;; One line code environment, 4 braces
+     ("\\({{{{\\)\\(.*?\\)\\(}}}}\\)"
+      (1 'moin-face-env-braces append)
+      (2 'moin-face-env append)
+      (3 'moin-face-env-braces append))
+     ;; One line code environment, 3 braces
+     ("\\({{{\\)\\(.*?\\)\\(}}}\\)"
+      (1 'moin-face-env-braces append)
+      (2 'moin-face-env append)
+      (3 'moin-face-env-braces append))
      ;; One line & multiline code environments with color spec
-     ("\\({\\{3,4\\}\\)\\(#!wiki \\([a-z]*?\\)/[a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-      (1 'moin-face-env-braces prepend)
-      (2 'moin-face-env-parser prepend)
-      (3 'moin-face-env-parser prepend)
-      (4 'moin-face-env t)
-      (5 'moin-face-env-braces prepend)
-      (0 (when moin-highlight-colored-env-p (moin--create-dynamic-bg-face (match-string 3))) prepend))
-     ;; One line & multiline code environments with other processing instructions
-     ("\\({\\{3,4\\}\\)\\(#![a-z]+ [a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-      (1 'moin-face-env-braces prepend)
-      (2 'moin-face-env-parser prepend)
-      (3 'moin-face-env t)
-      (4 'moin-face-env-braces prepend))
-     ;; One line & multiline code environments without color spec
-     ("\\({\\{3,4\\}\\)\\([^{#][[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-      (1 'moin-face-env-braces prepend)
-      (2 'moin-face-env t)
-      (3 'moin-face-env-braces prepend))
+     ;; ("\\({\\{3,4\\}\\)\\(#!wiki \\([a-z]*?\\)/[a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
+     ;;  (1 'moin-face-env-braces prepend)
+     ;;  (2 'moin-face-env-parser prepend)
+     ;;  (3 'moin-face-env-parser prepend)
+     ;;  (4 'moin-face-env t)
+     ;;  (5 'moin-face-env-braces prepend)
+     ;;  (0 (when moin-highlight-colored-env-p (moin--create-dynamic-bg-face (match-string 3))) prepend))
+     ;; ;; One line & multiline code environments with other processing instructions
+     ;; ("\\({\\{3,4\\}\\)\\(#![a-z]+ [a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
+     ;;  (1 'moin-face-env-braces prepend)
+     ;;  (2 'moin-face-env-parser prepend)
+     ;;  (3 'moin-face-env t)
+     ;;  (4 'moin-face-env-braces prepend))
+     ;; ;; One line & multiline code environments without color spec
+     ;; ("\\({\\{3,4\\}\\)\\([^{#][[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
+     ;;  (1 'moin-face-env-braces prepend)
+     ;;  (2 'moin-face-env t)
+     ;;  (3 'moin-face-env-braces prepend))
     
      ; ------
-     ; Highlighting Links
+     ; Highlighting Formatted Text
      ; -------
-     ;; Freehand absolute URL
-     ("\\(http\\|https\\|ftp\\|nntp\\|news\\|mailto\\|telnet\\|wiki\\|file\\|irc\\)\\(://[A-Za-z0-9_-+&?%#:./=;$]+\\)"
-      (1 'moin-face-followable-link t)
-      (2 'moin-face-followable-link t))
-     ;; EMail
-     ("\\([A-Za-z0-9_+-]+@[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\)"
-      (1 'moin-face-email t))
-     ;; Explicit Link
-     ("\\(\\[\\[\\)\\(.*?\\)\\(\\]\\]\\)"
-      (1 'moin-face-link-brackets t)
-      (2 'moin-face-link keep)
-      (3 'moin-face-link-brackets t))
-     ;; Moin WikiWord    
-     ("\\(?:^\\|[^A-Za-z!]\\)\\(\\(?:\\.\\./\\)?/?[A-Z][a-z]+[A-Z][a-z][A-Za-z]*\\(?:/[A-Z][a-z]+[A-Z][a-z][A-Za-z]*\\)?\\)"
-      (1 'moin-face-wiki-word t))
-    
+     ;; Bold in italic
+     ("\\(''.*?\\)\\('''.*?'''\\)\\(.*?''\\)"
+      (1 'moin-face-italic keep)
+      (2 'moin-face-bold keep)
+      (3 'moin-face-italic keep))
+     ;; Italic in bold
+     ("\\('''.*?\\)\\(''.*?''\\)\\(.*?'''\\)"
+      (1 'moin-face-bold keep)
+      (2 'moin-face-italic keep)
+      (3 'moin-face-bold keep))
+     ;; Bold
+     ("\\('''.*?'''\\)"
+      (1 'moin-face-bold keep))
+     ;; Italic
+     ("\\(''.*?''\\)"
+      (1 'moin-face-italic keep))
+     ;; Underline
+     ("\\(__.*?__\\)"
+      (1 'moin-face-underline keep))
+     ;; Strikethrough
+     ("\\(--(.*?)--\\)"
+      (1 'moin-face-stroke keep))
+     ;; Subscript
+     ("\\(,,.*?,,\\)"
+      (1 (list 'face 'moin-face-subscript 'display '(raise -0.3)) append))
+     ;; Superscript
+     ("\\(\\^.*?\\^\\)"
+      (1 (list 'face 'moin-face-superscript 'display '(raise 0.3)) append))
+     ;; Monospace
+     ("\\(`.*?`\\)"
+      (1 'moin-face-monospace append))
+     ;; Larger
+     ("\\(~\\+.*?\\+~\\)"
+      (1 'moin-face-larger append))
+     ;; Smaller
+     ("\\(~-.*?-~\\)"
+      (1 'moin-face-smaller append))
+
      ; ------
-     ; Highlighting various other elements
+     ; Highlighting Tables
      ; -------
-     ;; Horizontal rules
-     ("-\\{4,\\}" (0 'moin-face-rule t))
-     ;; Inline commentsm
-     ("\\(/\\*.*?\\*/\\)"
-      (1 'moin-face-comment t))
-     ;; Variables
-     ("\\(@.*?@\\)"
-      (1 'moin-face-variable t))
-     ;; Processing instructions
-     ("\\(^#.*$\\)"
-      (1 'moin-face-processing-instruction t))
+     ;; Table content until next separator
+     ;; Table processing instruction
+     ("||\\(<.*?>\\)"
+      (1 'moin-face-table-processing-instruction append))
+     ;; ;; Table with color spec
+     ;; ("^||<rowbgcolor=\"\\(.*?\\)\">.*$"
+     ;;  (0 (when moin-highlight-colored-table-p (moin--create-dynamic-bg-face (match-string 1))) prepend))
+     ("\\(.*?\\)\\(||\\)"
+      (1 'moin-face-table-content append)
+      (2 'moin-face-table-separator append))
+
+     ;; ; ------
+     ;; ; Highlighting Macros
+     ;; ; -------
+     ;; ;; Macro
+     ;; ("\\(<<\\)\\(.*?\\)\\(>>\\)"
+     ;;  (1 'moin-face-macro-braces)
+     ;;  (2 'moin-face-macro-content prepend)
+     ;;  (3 'moin-face-macro-braces))
+
+     ;; ; ------
+     ;; ; Highlighting Embeddings (e.g. Attachment)
+     ;; ; -------
+     ;; ;; Embedding
+     ;; ("\\([^{]{{\\)\\([^{].*?[^}]\\)\\(}}[^}]\\)"
+     ;;  (1 'moin-face-embedding-braces)
+     ;;  (2 'moin-face-embedding-content prepend)
+     ;;  (3 'moin-face-embedding-braces))
+    
+     ;; ; ------
+     ;; ; Highlighting Links
+     ;; ; -------
+     ;; ;; Freehand absolute URL
+     ;; ("\\(http\\|https\\|ftp\\|nntp\\|news\\|mailto\\|telnet\\|wiki\\|file\\|irc\\)\\(://[A-Za-z0-9_-+&?%#:./=;$]+\\)"
+     ;;  (1 'moin-face-followable-link t)
+     ;;  (2 'moin-face-followable-link t))
+     ;; ;; EMail
+     ;; ("\\([A-Za-z0-9_+-]+@[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\)"
+     ;;  (1 'moin-face-email t))
+     ;; ;; Explicit Link
+     ;; ("\\(\\[\\[\\)\\(.*?\\)\\(\\]\\]\\)"
+     ;;  (1 'moin-face-link-brackets t)
+     ;;  (2 'moin-face-link keep)
+     ;;  (3 'moin-face-link-brackets t))
+     ;; ;; Moin WikiWord    
+     ;; ("\\(?:^\\|[^A-Za-z!]\\)\\(\\(?:\\.\\./\\)?/?[A-Z][a-z]+[A-Z][a-z][A-Za-z]*\\(?:/[A-Z][a-z]+[A-Z][a-z][A-Za-z]*\\)?\\)"
+     ;;  (1 'moin-face-wiki-word t))
+    
+     ;; ; ------
+     ;; ; Highlighting various other elements
+     ;; ; -------
+     ;; ;; Horizontal rules
+     ;; ("-\\{4,\\}" (0 'moin-face-rule t))
+     ;; ;; Inline commentsm
+     ;; ("\\(/\\*.*?\\*/\\)"
+     ;;  (1 'moin-face-comment t))
+     ;; ;; Variables
+     ;; ("\\(@[a-zA-Z0-9].*?@\\)"
+     ;;  (1 'moin-face-variable t))
+     ;; ;; Processing instructions
+     ;; ("\\(^#.*$\\)"
+     ;;  (1 'moin-face-processing-instruction t))
     ) 'set))
 
 

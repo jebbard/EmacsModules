@@ -1064,7 +1064,17 @@ Expectations are given in the list form (current-column (start-point end-point c
   ;; Check with active region
   (check-func-at-point 'moin-command-meta-return
       "|| abc||def ||\n|| || gef||\nAny Text" 10 22
-      "|| abc|| de ||\n|| || fgef ||\nAny Text" 1))
+      "|| abc|| de ||\n|| || fgef ||\nAny Text" 1)
+  ;; Check within table delimiters (at beginning, middle and end of table)
+  (check-func-at-point 'moin-command-meta-return
+      "|| abc||def ||\n|| || gef||\nAny Text" 2 17
+      "||  ||def ||\n|| abc || gef||\nAny Text")
+  (check-func-at-point 'moin-command-meta-return
+      "|| abc||def ||\n|| || gef||\nAny Text" 8 20
+      "|| abc ||def ||\n||  || gef||\nAny Text")
+  (check-func-at-point 'moin-command-meta-return
+      "|| abc||def ||\n|| || gef||\nAny Text" 14 23
+      "|| abc|| def ||\n|| || gef ||\nAny Text"))
 
 
 (ert-deftest test-moin--meta-return-error ()
