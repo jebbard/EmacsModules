@@ -379,9 +379,9 @@ color could not be identified (e.g. during typing)."
      ;; Table processing instruction
      ("||\\(<.*?>\\)"
       (1 'moin-face-table-processing-instruction append))
-     ;; ;; Table with color spec
-     ;; ("^||<rowbgcolor=\"\\(.*?\\)\">.*$"
-     ;;  (0 (when moin-highlight-colored-table-p (moin--create-dynamic-bg-face (match-string 1))) prepend))
+     ;; Table with color spec
+     ("^||<rowbgcolor=\"\\(.*?\\)\">.*$"
+       (0 (when moin-highlight-colored-table-p (moin--create-dynamic-bg-face (match-string 1))) append))
      ("\\(.*?\\)\\(||\\)"
       (1 'moin-face-table-content append)
       (2 'moin-face-table-separator append))

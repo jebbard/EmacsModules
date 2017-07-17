@@ -107,6 +107,13 @@ In-Wiki-Link, no text and Wikiword: [[Start/MyWiki/ALink/To/Somewhere/Else]]
 In-Wiki-Link, with text and Wikiword: [[Start/MyWiki/ALink/To/Somewhere/Else|Some Text]]
 Relative wiki link with text and Wikiword [[../anyLink/ToAnyWhere|the text]]
 
+''Italic at start of line''
+'''''bold and italic'''''
+Test: ''italic only first, then '''also bold'''''
+Test: '''bold only first, then ''also italic'''''
+Test: ''here we have '''bold in the middle of''' italic''
+Test: '''here we have ''italic in the middle of'' bold'''
+
 == Level 2 Heading: Embedding ==
 
 {{attachment:x.png}}
@@ -115,6 +122,8 @@ In the middle: {{attachment:x.png}} here
 Embedded link to image {{http://example.net/image.png}}
 
 Embedded button in link [[http://example.net/|{{attachment:samplegraphic.png}}]]
+
+Irgendein Flieﬂtext mit @-Symbol, und ein weiteres @
 
 == Other highlightings ==
 

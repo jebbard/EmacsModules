@@ -362,35 +362,41 @@ without a heading before."
 
 (ert-deftest test-moin-command-meta-return ()
   "Checks `moin-command-meta-return' for headings"
-  ;; First we check issuing the command at the end of a heading line
+  ;; issuing the command at the end of a heading line
   (check-func-at-point 'moin-command-meta-return
 				"= Heading 1 =" 14 17 "= Heading 1 =\n=  =\n")
   (check-func-at-point 'moin-command-meta-return
 				"= Heading 1 =" 13 17 "= Heading 1 =\n=  =\n")
   (check-func-at-point 'moin-command-meta-return
 				"== Heading 2 ==" 13 20 "== Heading 2 ==\n==  ==\n")
-  ;; Then we check issuing the command within the prefix,
+  ;; issuing the command within the prefix,
   ;; but not directly at the beginning of a heading line, before any text
   (check-func-at-point 'moin-command-meta-return
 				"===== Heading 5 = = =" 4 29 "===== Heading 5 = = =\n=====  =====\n")
   (check-func-at-point 'moin-command-meta-return
 				"== Heading 2" 4 17 "== Heading 2\n==  ==\n")
-  ;; Then we check issuing the command at the beginning of a heading line
+  ;; issuing the command at the beginning of a heading line
   (check-func-at-point 'moin-command-meta-return
 				"=== Heading 3 " 1 5 "===  ===\n=== Heading 3 ")
-  ;; Then we check issuing the command within the heading text
+  ;; issuing the command within the heading text
   (check-func-at-point 'moin-command-meta-return
 				"= Heading 1 =" 4 17 "= H =\n= eading 1 =\n")
   (check-func-at-point 'moin-command-meta-return
 				"== Heading 2 ==" 11 20 "== Heading ==\n==  2 ==\n")
-  ;; Then we check issuing the command somewhere arbitrary behind a previous heading
+  ;; issuing the command somewhere arbitrary behind a previous heading
   (check-func-at-point 'moin-command-meta-return
       "== Heading 2 ==\nblindtext\nother text" 22 26 "== Heading 2 ==\nblind\n==  ==\ntext\nother text")
-  ;; Finally we check issuing the command before any other heading
+  ;; issuing the command before any other heading
   (check-func-at-point 'moin-command-meta-return
 	   "Text before heading\n== Heading 2 ==" 14 17 "Text before h\n=  =\neading\n== Heading 2 ==")
   (check-func-at-point 'moin-command-meta-return
-	   "Text before heading" 2 5 "T\n=  =\next before heading"))
+          "Text before heading" 2 5 "T\n=  =\next before heading")
+  ;; issuing the command at the beginning of the buffer, it should not appear on the
+  ;; next line, but on the first line
+  (check-func-at-point 'moin-command-meta-return
+	  "" 1 3 "=  =\n")
+  (check-func-at-point 'moin-command-meta-return
+	  "\nHallo" 1 3 "=  =\n\nHallo"))
 
 
 (ert-deftest test-moin-command-insert-heading-respect-content()
