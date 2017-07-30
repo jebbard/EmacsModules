@@ -94,10 +94,10 @@ of tables, set to nil otherwise. Default is t"
 (defface moin-face-monospace '((t (:family "Courier")))
   "Face name to use for typewriter text in moinmoin"
   :group 'moin-faces)
-(defface moin-face-larger '((t (:height 1.1)))
+(defface moin-face-larger '((t (:height 1.2)))
   "Face name to use for larger text in moinmoin"
   :group 'moin-faces)
-(defface moin-face-smaller '((t (:height 0.9)))
+(defface moin-face-smaller '((t (:height 0.8)))
   "Face name to use for smaller text in moinmoin"
   :group 'moin-faces)
 
@@ -284,9 +284,15 @@ color could not be identified (e.g. during typing)."
   (add-to-list 'font-lock-extra-managed-props 'display)
   (font-lock-add-keywords nil `(
     
-     ; ------
-     ; Highlighting Headings
-     ; -------
+     ;; *******
+     ;; Highlighting Headings
+     ;;				
+     ;; Requirements:
+     ;; - Headings are only highlighted if in one line and if not malformed
+     ;; - Formatting (bold, italic etc.) is not highlighted in headings
+     ;; - WikiWords, Macros, Links, Attachments or Variables
+     ;;   are not highlighted in Headings
+     ;; *******
      ("^\\(= .* =\\)$"
       (1 'moin-face-h1 append))
      ("^\\(== .* ==\\)$"
@@ -298,19 +304,29 @@ color could not be identified (e.g. during typing)."
      ("^\\(===== .* =====\\)$"
       (1 'moin-face-h5 append))
      
-     ; ------
-     ; Highlighting Environments
-     ; -------
-     ;; One line code environment, 4 braces
-     ("\\({{{{\\)\\(.*?\\)\\(}}}}\\)"
-      (1 'moin-face-env-braces append)
-      (2 'moin-face-env append)
-      (3 'moin-face-env-braces append))
-     ;; One line code environment, 3 braces
-     ("\\({{{\\)\\(.*?\\)\\(}}}\\)"
-      (1 'moin-face-env-braces append)
-      (2 'moin-face-env append)
-      (3 'moin-face-env-braces append))
+     ;; *******
+     ;; Highlighting Environments
+     ;;				
+     ;; Requirements:
+     ;; - Environments may start and end with three or four braces
+     ;; - They are always multiline, in a sense that the content of the environment
+     ;;   must start in the next line after the enviornment
+     ;; - Text might be before the start of an environment on the same line or after the
+     ;;   end of the environment on the same line
+     ;; - Headings or tables are not highlighted in environments
+     ;; - Formatting (bold, italic etc.) is not highlighted in environments
+     ;; - WikiWords, Macros, Links or Variables are not highlighted in environments
+     ;; *******
+     ;; Code environment without parser instructions, 4 braces
+     ;; ("\\({{{{\\)\\(.*?\\)\\(}}}}\\)"
+     ;;  (1 'moin-face-env-braces append)
+     ;;  (2 'moin-face-env append)
+     ;;  (3 'moin-face-env-braces append))
+     ;; ;; One line code environment, 3 braces
+     ;; ("\\({{{\\)\\(.*?\\)\\(}}}\\)"
+     ;;  (1 'moin-face-env-braces append)
+     ;;  (2 'moin-face-env append)
+     ;;  (3 'moin-face-env-braces append))
      ;; One line & multiline code environments with color spec
      ;; ("\\({\\{3,4\\}\\)\\(#!wiki \\([a-z]*?\\)/[a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
      ;;  (1 'moin-face-env-braces prepend)
@@ -331,9 +347,15 @@ color could not be identified (e.g. during typing)."
      ;;  (2 'moin-face-env t)
      ;;  (3 'moin-face-env-braces prepend))
     
-     ; ------
-     ; Highlighting Formatted Text
-     ; -------
+     ;; *******
+     ;; Highlighting Formatted Text
+     ;;				
+     ;; Requirements:
+     ;; - Formattings might overlap each other and must be correctly highlighted
+     ;; - Formatting is not highlighted in headings, environments or links
+     ;; - Formatting is highlighted in tables
+     ;; - Formatting never crosses multiple lines
+     ;; *******
      ;; Bold in italic
      ("\\(''.*?\\)\\('''.*?'''\\)\\(.*?''\\)"
       (1 'moin-face-italic keep)
@@ -358,25 +380,28 @@ color could not be identified (e.g. during typing)."
       (1 'moin-face-stroke keep))
      ;; Subscript
      ("\\(,,.*?,,\\)"
-      (1 (list 'face 'moin-face-subscript 'display '(raise -0.3)) append))
+      (1 (list 'face 'moin-face-subscript 'display '(raise -0.3)) keep))
      ;; Superscript
      ("\\(\\^.*?\\^\\)"
-      (1 (list 'face 'moin-face-superscript 'display '(raise 0.3)) append))
+      (1 (list 'face 'moin-face-superscript 'display '(raise 0.3)) keep))
      ;; Monospace
      ("\\(`.*?`\\)"
-      (1 'moin-face-monospace append))
+      (1 'moin-face-monospace keep))
      ;; Larger
      ("\\(~\\+.*?\\+~\\)"
-      (1 'moin-face-larger append))
+      (1 'moin-face-larger keep))
      ;; Smaller
      ("\\(~-.*?-~\\)"
-      (1 'moin-face-smaller append))
+      (1 'moin-face-smaller keep))
 
-     ; ------
-     ; Highlighting Tables
-     ; -------
-     ;; Table content until next separator
-     ;; Table processing instruction
+     ;; ------
+     ;; Highlighting Tables
+     ;;				
+     ;; Requirements:
+     ;; - Table delimiters must be at start and end of line to be highlighted as table
+     ;; - Formatting, Links, Wikiwords, Macros and Variables are highlighted in tables
+     ;; -------
+     ;; Table content until next separator incl. table processing instructions
      ("||\\(<.*?>\\)"
       (1 'moin-face-table-processing-instruction append))
      ;; Table with color spec
@@ -386,9 +411,13 @@ color could not be identified (e.g. during typing)."
       (1 'moin-face-table-content append)
       (2 'moin-face-table-separator append))
 
-     ;; ; ------
-     ;; ; Highlighting Macros
-     ;; ; -------
+     ;; ------
+     ;; Highlighting Macros
+     ;;				
+     ;; Requirements:
+     ;; - Table delimiters must be at start and end of line to be highlighted as table
+     ;; - Formatting, Links, Wikiwords, Macros and Variables are highlighted in tables
+     ;; -------
      ;; ;; Macro
      ;; ("\\(<<\\)\\(.*?\\)\\(>>\\)"
      ;;  (1 'moin-face-macro-braces)

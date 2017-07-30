@@ -361,8 +361,10 @@ the current point and moves point after the heading prefix."
 
 	(if (eq current-heading-level 0)
 	    (setq current-heading-level 1))
-	
-	(newline)
+
+	(if (not (bobp))
+	    (newline))
+
 	(moin--heading-create current-heading-level)))))
 
 
