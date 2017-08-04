@@ -216,7 +216,6 @@ FORMATTING-PREFIX-AND-SUFFIX and places point between them. If the
 region spans multiple lines, it throws an error, as MoinMoin does not
 support formatting to span multiple lines. It does not check if it is
 already in a formatted area."
-  (interactive "p")
   (let
       ((prefix-suffix-len (length formatting-prefix-and-suffix))
        start-point end-point)
@@ -567,7 +566,7 @@ and second it will not respect the type of the previous top - level
 item, but always inserts a bullet-point item. Thus, you should use
 this command really only to create a new list, and if you are already
 in a list, use `moin-command-meta-return' instead."
-  (interactive "p")
+  (interactive)
   (moin--list-insert-item moin-const-bullet-list))
 
 
@@ -585,7 +584,7 @@ and second it will not respect the type of the previous top - level
 item, but always inserts a numbered item. Thus, you should use this
 command really only to create a new list, and if you are already in a
 list, use `moin-command-meta-return' instead."
-  (interactive "p")
+  (interactive)
   (moin--list-insert-item moin-const-numbered-list))
 
 
