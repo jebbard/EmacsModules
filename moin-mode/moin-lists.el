@@ -66,10 +66,9 @@ character as first character of the line do break the list."
 
 (defun moin--list-get-item-info()
   "Retrieves information about the current list item where point is
-on. Always expects to currently be in a list, so any caller must
-ensure that this is actually the case. An item info always only refers
-to the current item and does not care whether this item is part of the
-subtree of another item, or it has a subtree itself.
+on. Returns nil if currently not in a list. An item info always only
+refers to the current item and does not care whether this item is part
+of the subtree of another item, or it has a subtree itself.
 
 The returned information is: 
 
@@ -116,7 +115,7 @@ where
   (save-excursion
     (beginning-of-line)
     
-    (while (and (looking-at "^\\s-") (not (looking-at list-regex)) (not (bobp)))
+    (while (and (or (looking-at "^\\s-") (eobp)) (not (looking-at list-regex)) (not (bobp)))
       (forward-line -1)
       (beginning-of-line))
 
@@ -189,7 +188,9 @@ point is currently not in a list."
 	  (end-of-line))
       ;; Item text starts before point -> Split item and insert new item after current
       (progn
-	(newline)
+	(if (not (bolp))
+	    (newline))
+	
 	(insert item-whitespace-before)
 	(insert item-starting-bullet)
 	(insert item-whitespace-after)))))
@@ -453,24 +454,38 @@ of the list-item-info returned by this function."
 
 
 
-(defun moin--list-point-at-beginning-of-next-line-or-eol(current-point)
-  "Starting from the current point, returns the point on the start of
-the next line, or if there is no next line, the point at end of line."
+(defun moin--list-get-actual-last-item-end-point(current-point)
+  "Starting from the CURRENT-POINT, determines the actual end point of
+the current list item (which is the last item of the list) by
+implementing the following logic: If the CURRENT-POINT is at the
+beginning of an empty line, it goes backwards one line until the first
+non-empty line. Otherwise it does not move from CURRENT-POINT. Then it
+goes to the beginning of the next line (if any) and returns this
+point. If there is no next line, it returns the point at end of the
+current line."
   (save-excursion
     (goto-char current-point)
     (if (eobp)
 	(point-at-eol)
       (progn
 	(forward-line)
+	(point-at-bol)
+
+	(while (looking-at "^$")
+	  (forward-line -1))
+
+	(forward-line)
 	(point-at-bol)))))
 
 
 (defun moin--list-get-subtree-end-point (list-item-info)
   "Determine the end point of the subtree of the given LIST-ITEM-INFO,
-i.e. the point where the last child subitem of the given item ends.
-Even that is not fully correct - we return the point on the beginning
-of the next line after the last child, if there is a next line,
-otherwise the point at eol."
+which is point at the beginning of the next line after thend of the
+item's subtree, or point at end of line if there is no next line.
+There is a special case: If the item is the last item in the list, and
+as one or multiple entirely empty lines at its end, these empty lines
+are not considered as being part of the item. Instead, the point at
+the beginning of the first padding empty line is returnd."
   (let (next-list-item-info
 	subtree-end-point
 	(item-start-point (car list-item-info))
@@ -491,15 +506,15 @@ otherwise the point at eol."
     ;; Determine the end point of the subtree (after trailing line break, if any, i.e. on
     ;; the next line behind the last subitem's end point)
     (cond
-     ;; The current item has no subtree
+     ;; The current item is the last item of the list and has no subtree
      ((eq next-item-start-point item-start-point) 
       (setq subtree-end-point
-	    (moin--list-point-at-beginning-of-next-line-or-eol item-end-point)))
+	    (moin--list-get-actual-last-item-end-point item-end-point)))
      ;; The list ends with a subtree item of the current item
      ((> next-item-level item-level) 
       (setq subtree-end-point
-	    (moin--list-point-at-beginning-of-next-line-or-eol next-item-end-point)))
-     ;; The subtree is followed up by a sibling list item on the
+	    (moin--list-get-actual-last-item-end-point next-item-end-point)))
+     ;; The current item's subtree is followed up by a sibling list item on the
      ;; same or smaller level than the current item's level
      ((<= next-item-level item-level)
       (setq subtree-end-point next-item-start-point)))

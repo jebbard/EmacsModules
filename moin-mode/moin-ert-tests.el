@@ -1397,81 +1397,47 @@ Expectations are given in the list form (current-column (start-point end-point c
   				 152 (list 132 152 135 1 " " "o." "")))
  
 
-
 (ert-deftest test-moin--get-list-item-info-error ()
   "Tests the behaviour of `moin--list-get-item-info' if not in a list."
-  (check-func-at-point-throws-error 'moin--list-get-item-info "arbitrary other test text" 10 'user-error)
-  (check-func-at-point-throws-error 'moin--list-get-item-info "A. sadasdasd" 1 'user-error)
-  (check-func-at-point-throws-error 'moin--list-get-item-info "*" 2 'user-error))
+  (check-read-only-func-at-point 'moin--list-get-item-info "arbitrary other test text" 10 nil)
+  (check-read-only-func-at-point 'moin--list-get-item-info "A. sadasdasd" 1 nil)
+  (check-read-only-func-at-point 'moin--list-get-item-info "*" 2 nil))
 
 
-(ert-deftest test-moin--list-insert-item-same-level--point-after-item-text()
-   "Tests `moin--list-insert-item-same-level': For various bullet types and indentations before and after the current bullet, and with point currently behind text of the item - Is expected to create a new item after the current one, with same bullet and indentation before and after bullet, no text after that."
-   (test-moin--check-insert-item-same-level--point-after-item-text " * " "Text")
-   (test-moin--check-insert-item-same-level--point-after-item-text " *" "t")
-   (test-moin--check-insert-item-same-level--point-after-item-text " A.   " "a")
-   (test-moin--check-insert-item-same-level--point-after-item-text " i." "My text")
-   (test-moin--check-insert-item-same-level--point-after-item-text " ." "another text")
-   (test-moin--check-insert-item-same-level--point-after-item-text " o.  	" "\n  \n\n looney item"))
+(ert-deftest test-moin--list-insert-item-same-level ()
+  "Tests `moin-command-meta-return' in lists"
+  
+  ;; Point behind the text of the item - Is expected to create a new item after the current one
+  ;; with same bullet and indentation before and after bullet, no text after that.
+  (check-func-at-point 'moin-command-meta-return " * Text" 8 12 " * Text\n * ")
+  (check-func-at-point 'moin-command-meta-return " *t" 4 7 " *t\n *")
+  (check-func-at-point 'moin-command-meta-return " A.   a" 8 15 " A.   a\n A.   ")
+  (check-func-at-point 'moin-command-meta-return " i.My text" 11 15 " i.My text\n i.")
+  (check-func-at-point 'moin-command-meta-return " .another text" 15 18 " .another text\n .")
+  (check-func-at-point 'moin-command-meta-return " o.  	\n  \n\n looney item" 24 31 " o.  	\n  \n\n looney item\n o.  	")
+  ;; Point before the text of the item - Is expected to create a new item before the current one
+  ;; with same bullet and indentation before and after bullet, no text after that on the same line.
+  (check-func-at-point 'moin-command-meta-return " * Text" 1 4 " * \n * Text")
+  (check-func-at-point 'moin-command-meta-return " *" 3 3 " *\n *")
+  (check-func-at-point 'moin-command-meta-return " A.   a" 7 7 " A.   \n A.   a")
+  (check-func-at-point 'moin-command-meta-return " i.My text" 3 4 " i.\n i.My text")
+  (check-func-at-point 'moin-command-meta-return " .another text" 1 3 " .\n .another text")
+  (check-func-at-point 'moin-command-meta-return " o.	\n  \n\n looney item" 4 5 " o.	\n o.	\n  \n\n looney item")
+  ;; Point within the text of the item - Is expected to create a new item after the current one
+  ;; with same bullet and indentation before and after bullet, with the text of the current item after point
+  ;; as text of the new item.
+  (check-func-at-point 'moin-command-meta-return " * Text" 6 10 " * Te\n * xt")
+  (check-func-at-point 'moin-command-meta-return " i.My text" 7 11 " i.My \n i.text")
+  (check-func-at-point 'moin-command-meta-return " .another text" 6 9 " .ano\n .ther text")
+  (check-func-at-point 'moin-command-meta-return " o.	\n  \n\n looney item" 6 10 " o.	\n o.	  \n\n looney item")
+  (check-func-at-point 'moin-command-meta-return " o.	\n  \n\n looney item" 9 13 " o.	\n  \n o.	\n looney item")
+  ;; Insert item at the end of a list after whitespace behind the last item
+  (check-func-at-point 'moin-command-meta-return " * Text\n * Last item\n" 22 25 " * Text\n * Last item\n * ")
+  (check-func-at-point 'moin-command-meta-return " * Text\n * Last item\n  \n	\n" 25 28 " * Text\n * Last item\n  \n * 	\n")
+  (check-func-at-point 'moin-command-meta-return " * Text\n * Last item\n\n\n\n" 24 27 " * Text\n * Last item\n\n\n * \n"))
 
 
-(defun test-moin--check-insert-item-same-level--point-after-item-text(item-prefix item-text)
-  (with-temp-buffer
-    (insert (concat item-prefix item-text))
-    (setq start-point (point))
-    (moin--list-insert-item-same-level)
-    (message "Buffer string after test method call:\n%s" (buffer-string))
-    (should (equal (+ start-point (length item-prefix) 1) (point)))
-    (should (equal t (eolp)))
-    (should (equal item-prefix (buffer-substring-no-properties (+ start-point 1) (point))))))
-
-
-(ert-deftest test-moin--list-insert-item-same-level--point-before-item-text()
-   "Tests `moin--list-insert-item-same-level': For various bullet types and indentations before and after the current bullet, and with point currently before the text of the item - Is expected to create a new item before the current one, with same bullet and indentation before and after bullet, no text after that on the same line."
-   (test-moin--check-insert-item-same-level--point-before-item-text " * " "Text")
-   (test-moin--check-insert-item-same-level--point-before-item-text " *" "")
-   (test-moin--check-insert-item-same-level--point-before-item-text " A.   " "a")
-   (test-moin--check-insert-item-same-level--point-before-item-text " i." "My text")
-   (test-moin--check-insert-item-same-level--point-before-item-text " ." "another text")
-   (test-moin--check-insert-item-same-level--point-before-item-text " o.	" "\n  \n\n looney item"))
-
-
-(defun test-moin--check-insert-item-same-level--point-before-item-text(item-prefix item-text)
-  (dotimes (start-point (+ 1 (length item-prefix)))
-    (with-temp-buffer
-      (insert (concat item-prefix item-text))
-      (goto-char start-point)
-      (moin--list-insert-item-same-level)
-      (message "Buffer string after %s test method call(s):\n%s" start-point (buffer-string))
-      (should (equal (+ (length item-prefix) 1) (point)))
-      (should (equal t (eolp)))
-      (should (equal item-prefix (buffer-substring-no-properties 1 (point)))))))
-
-
-(ert-deftest test-moin--list-insert-item-same-level--point-within-item-text()
-   "Tests `moin--list-insert-item-same-level': For various bullet types and indentations before and after the current bullet, and with point currently within the text of the item - Is expected to create a new item after the current one, with same bullet and indentation before and after bullet, with the text of the current item after point as text of the new item."
-   (test-moin--check-insert-item-same-level--point-within-item-text " * " "Text")
-   (test-moin--check-insert-item-same-level--point-within-item-text " A.   " "a")
-   (test-moin--check-insert-item-same-level--point-within-item-text " i." "My text")
-   (test-moin--check-insert-item-same-level--point-within-item-text " ." "another text")
-   (test-moin--check-insert-item-same-level--point-within-item-text " o.	" "\n  \n\n looney item"))
-
-
-(defun test-moin--check-insert-item-same-level--point-within-item-text(item-prefix item-text)
-  (dotimes (i (- (length item-text) 1))
-    (with-temp-buffer
-      (insert (concat item-prefix item-text))
-      (setq start-point (+ (length item-prefix) i 2))
-      (goto-char start-point)
-      (moin--list-insert-item-same-level)
-      (message "Buffer string after %s test method call(s):\n%s" (+ i 1) (buffer-string))
-      (should (equal (+ (length item-prefix) start-point 1) (point)))
-      (should (equal item-prefix (buffer-substring-no-properties (+ start-point 1) (point))))
-      (setq expected-new-item-text (substring item-text (+ i 1)))
-      (should (equal expected-new-item-text (buffer-substring-no-properties (point) (+ (point) (- (length item-text) i 1))))))))
-
-
-(ert-deftest test-moin--get-list-item-info-error ()
+(ert-deftest test-moin--list-insert-item-same-level-error ()
   "Tests the behaviour of `moin--list-insert-item-same-level' if not in a list."
   (check-func-at-point-throws-error 'moin--list-insert-item-same-level "arbitrary other test text" 10 'user-error)
   (check-func-at-point-throws-error 'moin--list-insert-item-same-level "A. sadasdasd" 1 'user-error)
@@ -1602,8 +1568,17 @@ Expectations are given in the list form (current-column (start-point end-point c
    " * Yours \n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n  * Subitem 2\n * My item\n")
   ;; Most complex mixture of all cases
   (check-func-at-point func
-		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * Third item\n   * Text\n\n Any Text behind" 165 52
-		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Third item\n   * Text\n\n Any Text behind"))
+  		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * Third item\n   * Text\n\n Any Text behind" 165 52
+  		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Third item\n   * Text\n\n Any Text behind")
+  ;; Moving an item at end of list with an empty line behind
+  (check-func-at-point func
+  		       " * My item \n * Yours\n" 15 3 " * Yours\n * My item \n")
+  (check-func-at-point func
+  		       " * My item \n * Yours\n\n" 15 3 " * Yours\n * My item \n\n")
+  (check-func-at-point func
+  		       " * My item \n * Yours\n\n\n\n" 15 3 " * Yours\n * My item \n\n\n\n")
+  (check-func-at-point func
+  		       " * My item \n * Yours\n\n  \n\n" 15 3 " * Yours\n\n  \n * My item \n\n"))
 
 
 (ert-deftest test--moin-list-move-subtree-up-error ()
@@ -1672,7 +1647,11 @@ Expectations are given in the list form (current-column (start-point end-point c
   ;; Most complex mixture of all cases
   (check-func-at-point func
   		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * Third item\n   * Text\n\n Any Text behind" 52 160
-  		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Third item\n   * Text\n\n Any Text behind"))
+  		       "Any Text before\n * Very first\n  * Sub1\n  * Sub2\n * Yours\n  * Subitem 1\n   * Subitem 1.1\n   * Subitem 1.2\n    * Subitem 1.2.1\n \n \n      \n  * Subitem 2\n \n   \n * My item\n  * My Sub 1\n  * My Sub 2\n  * My Sub 3\n   * My Sub 3.1\n    * My Sub 3.1.1\n     * My Sub 3.1.1.1\n \n \n \n * Third item\n   * Text\n\n Any Text behind")
+  ;; Moving an item to be the last item in the list, and the current
+  ;; last item has an empty line behind
+  (check-func-at-point func
+  		       " * My item \n * Yours\n\n" 8 17 " * Yours\n * My item \n\n"))
 
 
 (ert-deftest test--moin-list-move-subtree-down-error ()
