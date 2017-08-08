@@ -1,0 +1,280 @@
+= MoinMoin Testpage for the Emacs moinmode =
+
+;; *******
+;; Highlighting Headings
+;;				
+;; Requirements:
+;; - Headings are only highlighted if in one line and if not malformed
+;; - Formatting (bold, italic etc.) is not highlighted in headings
+;; - WikiWords, Macros, Links, Attachments or Variables
+;;   are not highlighted in Headings
+;; *******
+
+= Correct Test Heading 1 =
+== Correct Test Heading 2 ==
+=== Correct Test Heading 3 ===
+==== Correct Test Heading 4 ====
+===== Correct Test Heading 5 =====
+
+= Incorrect Heading 1
+== Incorrect Heading 2 = =
+II= Inline Incorrect Heading 3 =
+= Incorrect Heading with text behind =o
+
+= F''or''matting not Highlighted in Heading 1 =
+== Formatting in Hea'''d'''ing not highlighted 2 ==
+=== He__adi__ng  --(without)-- highlighted formatting 3 ===
+==== H`ead`ing ~-no -~form~+att+~ing 4 ====
+Superscript and subscript unfortunately are displayed in headings...
+===== Hea^din^g no ,,formatting,, 5 =====
+
+= WikiWord in Heading not highlighted =
+== <<Macro>> in Heading not highlighted ==
+=== http://www.google.com in Heading not highlighted ===
+=== [[http://www.google.com]] in Heading not highlighted ===
+=== {{attachment.png}} in Heading not highlighted ===
+=== @Variable@ in Heading not highlighted ===
+
+;; *******
+;; Highlighting Environments
+;;				
+;; Requirements:
+;; - Environments may start and end with three or four braces
+;; - They are always multiline, in a sense that the content of the environment
+;;   must start in the next line after the enviornment
+;; - Text might be before the start of an environment on the same line or after the
+;;   end of the environment on the same line
+;; - Headings or tables are not highlighted in environments
+;; - Formatting (bold, italic etc.) is not highlighted in environments
+;; - WikiWords, Macros, Links or Variables are not highlighted in environments
+;; *******
+
+{{{{
+Code with
+4 braces
+}}}}
+
+{{{
+Code with
+3 braces
+}}}
+
+Test{{{{
+Code with 4 braces and text before and behind
+}}}}Test
+
+Test{{{
+Code with 3 braces and text before and behind
+}}}Test
+
+Test{{{#!highlight java
+Code with 3 braces and processing instruction
+}}}
+
+{{{{#!wiki caution
+Code with 4 braces and processing instruction
+}}}} Test
+
+{{{#!wiki red/dotted
+Code with 3 braces and colored processing instruction
+}}}
+
+Text between
+
+{{{{#!wiki lightgoldenrodyellow/dotted
+Code with 4 braces and colored processing instruction
+}}}}
+
+{{{{
+C''od''e with '''various''' ^fo^rmat,,tin,,gs
+all __ov__er --(the)-- e~+nv+~iro~-nme-~nt
+}}}}
+
+{{{
+Environment 
+= With heading =
+}}}
+
+{{{{
+Environment
+|| With || table ||
+||  ||  ||
+}}}}
+
+;; *******
+;; Highlighting Formatted Text
+;;				
+;; Requirements:
+;; - Formatting that overlaps each other is only supported for bold and italic
+;;   i.e. starting a new formatting inside an existing formatted text might
+;;   not be highlighted correctly
+;; - Formatting is not highlighted in headings, environments or links
+;; - Formatting is highlighted in tables
+;; - Although MoinMoin seems to support formatting crossing multiple lines,
+;;   this mode does not support this
+;; - Known issue: Subscripts and superscripts are always highlighted, even in
+;;   headings and environments
+;; *******
+
+start ''Italic''    end
+
+start '''Bold'''    end
+
+start `Monospace`   end
+
+start __Underline__ end
+
+start --(Stroke)--  end
+
+start ~-smaller-~   end
+
+start ~+Larger+~    end
+
+start ^Superscript^ end
+
+start ,,Subscript,, end
+
+Formatting ''cros
+sing'' m--(ultiple
+ lines)-- is unsupported
+
+'''bold 
+text 
+covering
+
+multiple
+
+lines is not
+supported'''
+
+Test '''bold text at eol'''
+
+'''bold text at bol''' Test
+
+Test ''italic Text''
+
+''italic Text at bol'' Test
+
+Test '''bold ''inner italic Text'' text'''
+
+Test ''italic '''inner bold Text''' text''
+
+'''bold ''inner italic Text'' text''' Test
+
+''italic '''inner bold Text''' text'' Test
+
+Test ''starting italic '''starting bold, ending italic'' ending bold'''
+
+
+Stri--(kethrough '''overlapped by )-- bold'''
+
+;; *******
+;; Highlighting Macros
+;;				
+;; Requirements:
+;; - Macros start and end on the same line
+;; - Macros are highlighted if within formatted text
+;; - They are highlighted in tables, but not in code environments or headings
+;; *******
+
+<<Macro>>
+Text around <<Macro>> and behind
+<<Macros over multiple
+lines>> are not highlighted
+'''In formatted zones <<Macros>> are still higlighted'''
+
+;; *******
+;; Highlighting Embeddings (e.g. Attachment)
+;;				
+;; Requirements:
+;; - Embeddings cannot span multiple lines
+;; - Embeddings are also highlighted in tables
+;; *******
+
+{{EmbeddedStuff.jpeg}}
+
+In the middle: {{EmbeddedStuff.jpeg}} and behind
+Embedded link to image {{http://example.net/image.png}}
+
+{{Embedded Stuff
+over multiple lines not highlighted}}
+
+;; *******
+;; Highlighting Links
+;;				
+;; Requirements:
+;; - Freehand links are highlighted, but only until the first whitespace character
+;; - Links are also highlighted in tables
+;; - They cannot span multiple lines
+;; *******
+
+Start of line:
+http://www.google.com zweiter Link: news://blaub.com|irc://myirc.de
+
+Mid of line: https://huhz.com
+
+Email: jens@ebert.com
+
+Irgendein Flieﬂtext mit @Symbol, mit und ein weiteres @
+
+Explicit global link, no text: [[http://www.google.com]]
+
+Explicit global link, with text: [[https://www.google.de| mein Text hier]]
+
+In-Wiki-Link, no text and Wikiword: [[Start/MyWiki/ALink/To/Somewhere/Else]]
+In-Wiki-Link, with text and Wikiword: [[Start/MyWiki/ALink/To/Somewhere/Else|Some Text]]
+Relative wiki link with text and Wikiword [[../anyLink/ToAnyWhere|the text]]
+
+Embedded button in link [[http://example.net/|{{attachment:samplegraphic.png}}]]
+
+WikiWord
+
+In the niddle of WikiWord text
+
+No !WikiWord
+
+A FourElementWikiWord in the middle of the line
+
+;; *******
+;; Highlighting various other elements
+;;				
+;; Requirements:
+;; - Comments and variables are higlighted in tables, but not in headings or code environments
+;; - They must not span multiple lines
+;; *******
+
+Rules:
+----
+-----
+------
+-------
+--------
+
+/* Inline comment */
+Comment in the line : /* COMMMENT */ and a second /* comment */ on the same line
+
+A @variable@ here
+@var@ at start of line and a @secondvariable@ in the middle 
+
+
+;; *******
+;; Highlighting Tables
+;;				
+;; Requirements:
+;; - Table delimiters must be at start and end of line to be highlighted as table
+;; - Formatting, Links, Wikiwords, Macros and Variables are highlighted in tables
+;; *******
+
+||<rowbgcolor="#CCCCCC"> no formatting ||<|4> Hallo ''italic'' huhu	  ||
+|| no formatting || '''bold'''	  ||
+|| no formatting || `monospace` ||
+|| no formatting ||  monospace ||
+|| no formatting || __underline__ ||
+|| {{attachment:x.png}} || --(stroke)--  ||
+|| no formatting but {{{code in table}}} || ~-smaller-~	  ||
+|| news://blaub.com|irc://myirc.de || ~+larger+~	  ||
+|| no formatting but No !WikiWord || ^super^script ||
+|| no formatting but A @variable@ here || ,,sub,,script ||
+|| [[http://example.net/|{{attachment:samplegraphic.png}}]] || WikiWord ||
+|| no formatting but /* Inline comment */ || <<Macro>> ||
+|| no formatting but Email: jens@ebert.com || [[http://www.google.com]] ||
