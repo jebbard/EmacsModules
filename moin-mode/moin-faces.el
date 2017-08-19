@@ -235,6 +235,7 @@ of tables, set to nil otherwise. Default is t"
   "Face to use for variables in moinmoin"
   :group 'moin-faces)
 
+
 ;; ==================================================
 ;; "Private" Functions
 (defun moin--create-dynamic-bg-face(bg-color-name)
@@ -251,7 +252,7 @@ during typing)."
 	g
 	b
 	fg-color-name)
-
+    
     (if (color-defined-p bg-color-name)
 	(progn
 					; Get the face symbol if already defined before
@@ -269,7 +270,7 @@ during typing)."
 	  (setq g (car (cdr rgb-bg-color)))
 	  (setq b (car (cdr (cdr rgb-bg-color))))
 
-					; Set the foreground color based on the "darkness" of the bg color
+          ;; Set the foreground color based on the "darkness" of the bg color
 	  (if (> (+ r g b) 1.5)
 	      (setq fg-color-name moin-face-env-light-fg)
 	    (setq fg-color-name moin-face-env-dark-fg))
@@ -282,33 +283,89 @@ during typing)."
       'moin-face-env-usual-bg)))
 
 
+(defun moin--code-environment-matcher (bound)
+  "Matcher to find multiline code environments, searching from current
+point up to BOUND. Returns t if it finds that a code environment
+starts after point and ends before point + BOUND. Returns nil
+otherwise."
+  (let (start-brace-begin
+	start-brace-end
+	pi-begin
+	pi-end
+	code-begin
+	code-end
+	end-brace-begin
+	end-brace-end
+	not-first-line)
+    
+    (catch 'match
+      (while (< (point) bound)
+	(unless (search-forward-regexp "{{{{\\|{{{" bound t)
+	  (throw 'match nil))
+	
+	(let ((start-brace-begin (match-beginning 0))
+	      (start-brace-end (match-end 0))
+	      pi-begin
+	      pi-end
+	      pi-color-begin
+	      pi-color-end
+	      code-begin
+	      code-end
+	      end-brace-begin
+	      end-brace-end)
+	  
+	  (unless (get-text-property start-brace-begin 'moin-verb)
+	    (goto-char start-brace-end)
+
+	    ;; Processing instruction with color
+	    (if (looking-at "#!wiki \\([a-z]*?\\)/[a-z]+?$")
+		(progn
+		  (setq pi-begin (match-beginning 0))
+		  (setq pi-end (match-end 0))
+		  (setq pi-color-begin (match-beginning 1))
+		  (setq pi-color-end (match-end 1))
+		  (setq code-begin (match-end 0)))
+	      ;; Other processing instructions
+	      (if (looking-at "#!.*$")
+		  (progn
+		    (setq pi-begin (match-beginning 0))
+		    (setq pi-end (match-end 0))
+		    (setq code-begin (match-end 0)))
+		(setq code-begin start-brace-end)))
+	    
+	    (goto-char code-begin)
+	    
+	    (while (looking-at
+		    "\\(?:.*?\\|{{{{.*?}}}}\\|{{{.*?}}}\\|.\\)*?\\(?:\\(}}}}\\|}}}\\)\\|\n\\)")
+	      (goto-char (match-end 0))
+	      
+	      ;; We found the end of the code environment or a line end (match group 1 is non-nil)
+	      (when (and (match-beginning 1) not-first-line)
+
+		(setq code-end (match-beginning 1)
+		      end-brace-begin (match-beginning 1)
+		      end-brace-end (match-end 1))
+
+		;; These are the group positions (start end) to highlight
+		(set-match-data (list start-brace-begin end-brace-end
+				      start-brace-begin start-brace-end
+				      pi-begin          pi-end
+				      pi-color-begin    pi-color-end
+				      code-begin        code-end
+				      end-brace-begin   end-brace-end))
+		(throw 'match t))
+	      (setq not-first-line t))
+	    (throw 'match nil)))))))
+
+
 (defun moin--setup-font-lock ()
   "Installs all font lock patterns for syntax highlighting in their
 required order"
   (setq font-lock-multiline t)
   (make-local-variable 'font-lock-extra-managed-props)
   (add-to-list 'font-lock-extra-managed-props 'display)
+  (add-to-list 'font-lock-extra-managed-props 'moin-verb)
   (font-lock-add-keywords nil `(
-    
-     ;; *******
-     ;; Highlighting Headings
-     ;;				
-     ;; Requirements:
-     ;; - Headings are only highlighted if in one line and if not malformed
-     ;; - Formatting (bold, italic etc.) is not highlighted in headings
-     ;; - WikiWords, Macros, Links, Attachments or Variables
-     ;;   are not highlighted in Headings
-     ;; *******
-     ("^\\(= .* =\\)$"
-      (1 'moin-face-h1 append))
-     ("^\\(== .* ==\\)$"
-      (1 'moin-face-h2 append))
-     ("^\\(=== .* ===\\)$"
-      (1 'moin-face-h3 append))
-     ("^\\(==== .* ====\\)$"
-      (1 'moin-face-h4 append))
-     ("^\\(===== .* =====\\)$"
-      (1 'moin-face-h5 append))
      
      ;; *******
      ;; Highlighting Environments
@@ -323,35 +380,33 @@ required order"
      ;; - Formatting (bold, italic etc.) is not highlighted in environments
      ;; - WikiWords, Macros, Links or Variables are not highlighted in environments
      ;; *******
-     ;; Code environment without parser instructions, 4 braces
-     ;; ("\\({{{{\\)\\(.*?\\)\\(}}}}\\)"
-     ;;  (1 'moin-face-env-braces append)
-     ;;  (2 'moin-face-env append)
-     ;;  (3 'moin-face-env-braces append))
-     ;; ;; One line code environment, 3 braces
-     ;; ("\\({{{\\)\\(.*?\\)\\(}}}\\)"
-     ;;  (1 'moin-face-env-braces append)
-     ;;  (2 'moin-face-env append)
-     ;;  (3 'moin-face-env-braces append))
-     ;; One line & multiline code environments with color spec
-     ;; ("\\({\\{3,4\\}\\)\\(#!wiki \\([a-z]*?\\)/[a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-     ;;  (1 'moin-face-env-braces prepend)
-     ;;  (2 'moin-face-env-parser prepend)
-     ;;  (3 'moin-face-env-parser prepend)
-     ;;  (4 'moin-face-env t)
-     ;;  (5 'moin-face-env-braces prepend)
-     ;;  (0 (when moin-highlight-colored-env-p (moin--create-dynamic-bg-face (match-string 3))) prepend))
-     ;; ;; One line & multiline code environments with other processing instructions
-     ;; ("\\({\\{3,4\\}\\)\\(#![a-z]+ [a-z]+?$\\)\\([[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-     ;;  (1 'moin-face-env-braces prepend)
-     ;;  (2 'moin-face-env-parser prepend)
-     ;;  (3 'moin-face-env t)
-     ;;  (4 'moin-face-env-braces prepend))
-     ;; ;; One line & multiline code environments without color spec
-     ;; ("\\({\\{3,4\\}\\)\\([^{#][[:ascii:][:nonascii:]]*?\\)\\(}\\{3,4\\}\\)"
-     ;;  (1 'moin-face-env-braces prepend)
-     ;;  (2 'moin-face-env t)
-     ;;  (3 'moin-face-env-braces prepend))
+     (moin--code-environment-matcher
+      (0 (when (and moin-highlight-colored-env-p (match-string 3)) (moin--create-dynamic-bg-face (match-string 3))) keep)
+      (1 (list 'face 'moin-face-env-braces 'moin-verb t) keep)
+      (2 (list 'face 'moin-face-env-parser 'moin-verb t) keep t)
+      (3 (list 'face 'moin-face-env-parser 'moin-verb t) keep t)
+      (4 (list 'face 'moin-face-env        'moin-verb t) keep)
+      (5 (list 'face 'moin-face-env-braces 'moin-verb t) keep))
+    
+     ;; *******
+     ;; Highlighting Headings
+     ;;				
+     ;; Requirements:
+     ;; - Headings are only highlighted if in one line and if not malformed
+     ;; - Formatting (bold, italic etc.) is not highlighted in headings
+     ;; - WikiWords, Macros, Links, Attachments or Variables
+     ;;   are not highlighted in Headings
+     ;; *******
+     ("^\\(= .* =\\)$"
+      (1 'moin-face-h1 keep))
+     ("^\\(== .* ==\\)$"
+      (1 'moin-face-h2 keep))
+     ("^\\(=== .* ===\\)$"
+      (1 'moin-face-h3 keep))
+     ("^\\(==== .* ====\\)$"
+      (1 'moin-face-h4 keep))
+     ("^\\(===== .* =====\\)$"
+      (1 'moin-face-h5 keep))
 
      ;; *******
      ;; Highlighting Macros

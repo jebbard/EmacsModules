@@ -1,4 +1,4 @@
-= MoinMoin Testpage for the Emacs moinmode =
+= MoinMoin Syntax Highlighting Testpage for the Emacs moinmode =
 
 ;; *******
 ;; Highlighting Headings
