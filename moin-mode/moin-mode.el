@@ -190,6 +190,7 @@
   ;; Formatting commands
   (define-key moin-mode-map (kbd "C-c C-f C-b") 'moin-command-format-bold)
   (define-key moin-mode-map (kbd "C-c C-f C-i") 'moin-command-format-italic)
+  (define-key moin-mode-map (kbd "C-c C-f C-e") 'moin-command-format-italic)
   (define-key moin-mode-map (kbd "C-c C-f C-u") 'moin-command-format-underline))
 
 

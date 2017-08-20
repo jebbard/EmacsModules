@@ -471,7 +471,7 @@ current line."
 	(forward-line)
 	(point-at-bol)
 
-	(while (looking-at "^$")
+	(while (or (looking-at "^$") (not (looking-at "^[ \t]")))
 	  (forward-line -1))
 
 	(forward-line)

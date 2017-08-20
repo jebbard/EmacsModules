@@ -1,39 +1,5 @@
 = MoinMoin Syntax Highlighting Testpage for the Emacs moinmode =
 
-;; *******
-;; Highlighting Headings
-;;				
-;; Requirements:
-;; - Headings are only highlighted if in one line and if not malformed
-;; - Formatting (bold, italic etc.) is not highlighted in headings
-;; - WikiWords, Macros, Links, Attachments or Variables
-;;   are not highlighted in Headings
-;; *******
-
-= Correct Test Heading 1 =
-== Correct Test Heading 2 ==
-=== Correct Test Heading 3 ===
-==== Correct Test Heading 4 ====
-===== Correct Test Heading 5 =====
-
-= Incorrect Heading 1
-== Incorrect Heading 2 = =
-II= Inline Incorrect Heading 3 =
-= Incorrect Heading with text behind =o
-
-= F''or''matting not Highlighted in Heading 1 =
-== Formatting in Hea'''d'''ing not highlighted 2 ==
-=== He__adi__ng  --(without)-- highlighted formatting 3 ===
-==== H`ead`ing ~-no -~form~+att+~ing 4 ====
-Superscript and subscript unfortunately are displayed in headings...
-===== Hea^din^g no ,,formatting,, 5 =====
-
-= WikiWord in Heading not highlighted =
-== <<Macro>> in Heading not highlighted ==
-=== http://www.google.com in Heading not highlighted ===
-=== [[http://www.google.com]] in Heading not highlighted ===
-=== {{attachment.png}} in Heading not highlighted ===
-=== @Variable@ in Heading not highlighted ===
 
 ;; *******
 ;; Highlighting Environments
@@ -100,6 +66,43 @@ Environment
 || With || table ||
 ||  ||  ||
 }}}}
+
+
+;; *******
+;; Highlighting Headings
+;;				
+;; Requirements:
+;; - Headings are only highlighted if in one line and if not malformed
+;; - Formatting (bold, italic etc.) is not highlighted in headings
+;; - WikiWords, Macros, Links, Attachments or Variables
+;;   are not highlighted in Headings
+;; *******
+
+= Correct Test Heading 1 =
+== Correct Test Heading 2 ==
+=== Correct Test Heading 3 ===
+==== Correct Test Heading 4 ====
+===== Correct Test Heading 5 =====
+
+= Incorrect Heading 1
+== Incorrect Heading 2 = =
+II= Inline Incorrect Heading 3 =
+= Incorrect Heading with text behind =o
+
+= F''or''matting not Highlighted in Heading 1 =
+== Formatting in Hea'''d'''ing not highlighted 2 ==
+=== He__adi__ng  --(without)-- highlighted formatting 3 ===
+==== H`ead`ing ~-no -~form~+att+~ing 4 ====
+Superscript and subscript unfortunately are displayed in headings...
+===== Hea^din^g no ,,formatting,, 5 =====
+
+= WikiWord in Heading not highlighted =
+== <<Macro>> in Heading not highlighted ==
+=== http://www.google.com in Heading not highlighted ===
+=== [[http://www.google.com]] in Heading not highlighted ===
+=== {{attachment.png}} in Heading not highlighted ===
+=== @Variable@ in Heading not highlighted ===
+
 
 ;; *******
 ;; Highlighting Formatted Text

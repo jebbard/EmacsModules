@@ -1579,7 +1579,7 @@ Expectations are given in the list form (current-column (start-point end-point c
   		       " * My item \n * Yours\n\n\n\n" 15 3 " * Yours\n * My item \n\n\n\n")
   (check-func-at-point func
   		       " * My item \n * Yours\n\n  \n\n" 15 3 " * Yours\n\n  \n * My item \n\n")
-  (check-func-at-point 'moin-command-meta-down " * a\n * text\n\n= Test =\n" 4 12 " * text\n * a\n\n= Test =\n"))
+  (check-func-at-point func " * a\n * text\n\n= Test =\n" 9 4 " * text\n * a\n\n= Test =\n"))
 
 
 (ert-deftest test--moin-list-move-subtree-up-error ()
@@ -1653,7 +1653,7 @@ Expectations are given in the list form (current-column (start-point end-point c
   ;; last item has an empty line behind
   (check-func-at-point func
   		       " * My item \n * Yours\n\n" 8 17 " * Yours\n * My item \n\n")
-  (check-func-at-point 'moin-command-meta-up " * a\n * text\n\n= Test =\n" 9 4 " * text\n * a\n\n= Test =\n"))
+  (check-func-at-point func " * a\n * text\n\n= Test =\n" 4 12 " * text\n * a\n\n= Test =\n"))
 
 
 (ert-deftest test--moin-list-move-subtree-down-error ()

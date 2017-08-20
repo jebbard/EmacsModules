@@ -70,9 +70,77 @@ of tables, set to nil otherwise. Default is t"
 ;; ==================================================
 ;; Face definitions
 
-; ------
-; Highlighting Formatted Text
-; -------
+;; *******
+;; Highlighting Environments
+;; *******
+(defconst moin-face-env-light-fg "grey30"
+  "Face to use in a code environment in case of light background")
+(defconst moin-face-env-dark-fg "white"
+  "Face to use in a code environment in case of dark background")
+
+(defface moin-face-env
+  '((((class color) (background light)) (:foreground "grey30" :inherit 'moin-face-monospace))
+    (((class color) (background dark)) (:foreground "white" :inherit 'moin-face-monospace)))
+  "Face to use for code inside braces in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-env-braces
+  '((((class color) (background light)) (:foreground "Gray70"))
+    (((class color) (background dark)) (:foreground "DarkGray")))
+  "Face to use for baces which delimit environments in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-env-parser '((t (:foreground "plum3" :weight bold)))
+  "Face to use for parser specs"
+  :group 'moin-faces)
+(defface moin-face-env-usual-bg
+  '((((class color) (background light)) (:background "black" :inherit 'moin-face-monospace))
+    (((class color) (background dark)) (:background "white" :inherit 'moin-face-monospace)))
+  "Face to use for usual code env background"
+  :group 'moin-faces)
+
+;; *******
+;; Highlighting Headings
+;; *******
+(defface moin-face-h1
+  '((((class color) (background light)) (:height 1.4 :foreground "Blue1"))
+    (((class color) (background dark)) (:height 1.4 :foreground "LightSkyBlue")))
+  "Face to use for level 1 headings in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-h2
+  '((((class color) (background light)) (:height 1.3 :foreground "DarkGoldenrod"))
+    (((class color) (background dark)) (:height 1.3 :foreground "LightGoldenrod")))
+  "Face to use for level 2 headings in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-h3
+  '((((class color) (background light)) (:height 1.2 :foreground "Purple"))
+    (((class color) (background dark)) (:height 1.2 :foreground "Cyan1")))
+  "Face to use for level 3 headings in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-h4
+  '((((class color) (background light)) (:height 1.1 :foreground "Firebrick"))
+    (((class color) (background dark)) (:height 1.1 :foreground "chocolate1")))
+  "Face to use for level 4 headings in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-h5
+  '((((class color) (background light)) (:foreground "ForestGreen"))
+    (((class color) (background dark)) (:foreground "PaleGreen")))
+  "Face to use for level 5 headings in moinmoin"
+  :group 'moin-faces)
+
+;; *******
+;; Highlighting Macros
+;; *******
+(defface moin-face-macro-content '((t (:foreground "Dark Blue")))
+  "Face to use for names of macros in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-macro-braces
+  '((((class color) (background light)) (:foreground "Gray70"))
+    (((class color) (background dark)) (:foreground "DarkGray")))
+  "Face to use for macros braces in moinmoin"
+  :group 'moin-faces)
+
+;; *******
+;; Highlighting Formatted Text
+;; *******
 (defface moin-face-bold '((t (:weight bold)))
   "Face to use for bold text in moinmoin"
   :group 'moin-faces)
@@ -101,109 +169,21 @@ of tables, set to nil otherwise. Default is t"
   "Face to use for smaller text in moinmoin"
   :group 'moin-faces)
 
-; ------
-; Highlighting Tables
-; -------
-(defface moin-face-table-separator
-  '((((class color) (background light)) (:foreground "Blue1"))
-    (((class color) (background dark)) (:foreground "LightSkyBlue")))
-  "Face to use for separation of columns in tables of moinmoin"
-  :group 'moin-faces)
-(defface moin-face-table-content
-  '((((class color) (background light)) (:foreground "Blue1"))
-    (((class color) (background dark)) (:foreground "LightSkyBlue")))
-  "Face to use for tables content in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-table-processing-instruction
-  '((((class color) (background light)) (:foreground "DarkGray" :weight bold))
-    (((class color) (background dark)) (:foreground "Gray70" :weight bold)))
-  "Face to use for processing instructions in tables of moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Macros
-; -------
-(defface moin-face-macro-content '((t (:foreground "Dark Blue")))
-  "Face to use for names of macros in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-macro-braces
-  '((((class color) (background light)) (:foreground "Gray70"))
-    (((class color) (background dark)) (:foreground "DarkGray")))
-  "Face to use for macros braces in moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Embeddings (e.g. attachments)
-; -------
+;; *******
+;; Highlighting Embeddings (e.g. attachments)
+;; *******
 (defface moin-face-embedding-content '((t (:foreground "Orange")))
   "Face to use for cointent of embeddings in moinmoin"
   :group 'moin-faces)
 (defface moin-face-embedding-braces
   '((((class color) (background light)) (:foreground "Gray70"))
     (((class color) (background dark)) (:foreground "DarkGray")))
-  "Face to use embedding braces in moinmoin"
+  "Face to use for embedding braces in moinmoin"
   :group 'moin-faces)
 
-; ------
-; Highlighting Headings
-; -------
-(defface moin-face-h1
-  '((((class color) (background light)) (:height 1.4 :foreground "Blue1"))
-    (((class color) (background dark)) (:height 1.4 :foreground "LightSkyBlue")))
-  "Face to use for level 1 headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h2
-  '((((class color) (background light)) (:height 1.3 :foreground "DarkGoldenrod"))
-    (((class color) (background dark)) (:height 1.3 :foreground "LightGoldenrod")))
-  "Face to use for level 2 headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h3
-  '((((class color) (background light)) (:height 1.2 :foreground "Purple"))
-    (((class color) (background dark)) (:height 1.2 :foreground "Cyan1")))
-  "Face to use for level 3 headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h4
-  '((((class color) (background light)) (:height 1.1 :foreground "Firebrick"))
-    (((class color) (background dark)) (:height 1.1 :foreground "chocolate1")))
-  "Face to use for level 4 headings in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-h5
-  '((((class color) (background light)) (:foreground "ForestGreen"))
-    (((class color) (background dark)) (:foreground "PaleGreen")))
-  "Face to use for level 5 headings in moinmoin"
-  :group 'moin-faces)
-
-; ------
-; Highlighting Environments
-; -------
-
-(defconst moin-face-env-light-fg "grey30"
-  "Face to use in a code environment in case of light background")
-(defconst moin-face-env-dark-fg "white"
-  "Face to use in a code environment in case of dark background")
-
-(defface moin-face-env
-  '((((class color) (background light)) (:foreground "grey30" :inherit 'moin-face-monospace))
-    (((class color) (background dark)) (:foreground "white" :inherit 'moin-face-monospace)))
-  "Face to use for code inside braces in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-env-braces
-  '((((class color) (background light)) (:foreground "Gray70"))
-    (((class color) (background dark)) (:foreground "DarkGray")))
-  "Face to use for baces which delimit environments in moinmoin"
-  :group 'moin-faces)
-(defface moin-face-env-parser '((t (:foreground "plum3" :weight bold)))
-  "Face to use for parser specs"
-  :group 'moin-faces)
-(defface moin-face-env-usual-bg
-  '((((class color) (background light)) (:background "black" :inherit 'moin-face-monospace))
-    (((class color) (background dark)) (:background "white" :inherit 'moin-face-monospace)))
-  "Face to use for usual code env background"
-  :group 'moin-faces)
-
-; ------
-; Links
-; -------
+;; *******
+;; Links
+;; *******
 (defface moin-face-link
     '((((class color) (background light)) (:foreground "Purple"))
       (((class color) (background dark)) (:foreground "Cyan")))
@@ -222,9 +202,9 @@ of tables, set to nil otherwise. Default is t"
   "Face to use for WikiWords in moinmoin"
   :group 'moin-faces)
 
-; ------
-; Highlighting various other elements
-; -------
+;; *******
+;; Highlighting various other elements
+;; *******
 (defface moin-face-rule '((t (:foreground "tomato2" :weight bold)))
   "Face to use for rules in moinmoin"
   :group 'moin-faces)
@@ -233,6 +213,25 @@ of tables, set to nil otherwise. Default is t"
   :group 'moin-faces)
 (defface moin-face-variable '((t (:inherit 'moin-face-monospace)))
   "Face to use for variables in moinmoin"
+  :group 'moin-faces)
+
+;; *******
+;; Highlighting Tables
+;; *******
+(defface moin-face-table-separator
+  '((((class color) (background light)) (:foreground "Blue1"))
+    (((class color) (background dark)) (:foreground "LightSkyBlue")))
+  "Face to use for separation of columns in tables of moinmoin"
+  :group 'moin-faces)
+(defface moin-face-table-content
+  '((((class color) (background light)) (:foreground "Blue1"))
+    (((class color) (background dark)) (:foreground "LightSkyBlue")))
+  "Face to use for tables content in moinmoin"
+  :group 'moin-faces)
+(defface moin-face-table-processing-instruction
+  '((((class color) (background light)) (:foreground "DarkGray" :weight bold))
+    (((class color) (background dark)) (:foreground "Gray70" :weight bold)))
+  "Face to use for processing instructions in tables of moinmoin"
   :group 'moin-faces)
 
 
