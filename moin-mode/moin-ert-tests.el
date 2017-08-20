@@ -1775,10 +1775,13 @@ have a subtree, the behavior for both commands must be the same."
   (check-func-at-point command
   		       " * My item \n   * Subitem 1\n    * Subitem 1.1\n   * Subitem 2\n * Yours" 52 51
   		       " * My item \n   * Subitem 1\n    * Subitem 1.1\n  * Subitem 2\n * Yours")
-  ;; Outdent items after previous higher level items
+  ;; Outdent items after previous higher level items (without and with tabs)
   (check-func-at-point command
   		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n  * Yours" 71 70
-  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours"))
+  		       " * My item \n   * Subitem 1\n   * Subitem 2\n     * Subitem 2.1\n * Yours")
+  (check-func-at-point command
+  		       " * My item \n \t* Subitem 1" 17 16
+  		       " * My item \n * Subitem 1"))
 
 
 (defun test--moin-list-outdentation-error (command)

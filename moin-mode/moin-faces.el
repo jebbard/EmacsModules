@@ -234,6 +234,13 @@ of tables, set to nil otherwise. Default is t"
   "Face to use for processing instructions in tables of moinmoin"
   :group 'moin-faces)
 
+;; *******
+;; Highlighting Lists
+;; *******
+(defface moin-face-list-bullet '((t (:foreground "brown" :weight bold)))
+  "Face to use for list bullets in moinmoin"
+  :group 'moin-faces)
+
 
 ;; ==================================================
 ;; "Private" Functions
@@ -254,10 +261,10 @@ during typing)."
     
     (if (color-defined-p bg-color-name)
 	(progn
-					; Get the face symbol if already defined before
+	  ;; Get the face symbol if already defined before
 	  (setq face-symbol (intern-soft bg-color-name))
 
-					; Or create it newly if it wasn't
+	  ;; Or create it newly if it wasn't
 	  (if face-symbol nil
 	    (progn
 	      (setq face-symbol (intern (concat "moin-face-env-" bg-color-name)))))
@@ -541,6 +548,16 @@ required order"
      ("\\(.*?\\)\\(||\\)"
       (1 'moin-face-table-content append)
       (2 'moin-face-table-separator append))
+     ;; *******
+     ;; Highlighting List Bullets
+     ;;				
+     ;; Requirements:
+     ;; - All kinds of list bullets are highlighted, but not the list text itself
+     ;; - This only applies for valid list bullets, i.e. correct list bullet character(s)
+     ;;    with at leastone space or tab character before it at beginning of line
+     ;; *******
+     ("^[ \t]+\\([.*]\\|[0-9a-zA-Z]\\.\\|[ixvcmlIXVCML]+\\.\\)"
+      (1 'moin-face-list-bullet append))
     ) 'set))
 
 

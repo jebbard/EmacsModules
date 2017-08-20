@@ -281,3 +281,25 @@ A @variable@ here
 || [[http://example.net/|{{attachment:samplegraphic.png}}]] || WikiWord ||
 || no formatting but /* Inline comment */ || <<Macro>> ||
 || no formatting but Email: jens@ebert.com || [[http://www.google.com]] ||
+
+
+;; *******
+;; Highlighting List Bullets
+;;				
+;; Requirements:
+;; - All kinds of list bullets are highlighted, but not the list text itself
+;; - This only applies for valid list bullets, i.e. correct list bullet character(s)
+;;    with at leastone space or tab character before it at beginning of line
+;; *******
+ * List item
+	* numbered list item
+	A. letter list item
+     * Indented item
+ o. lower-case letter list item
+ . Point list item
+   I. Roman item
+   IV. Roman bullet item
+ LMCXXXX. 
+ I. 
+
+1. no list item
