@@ -144,7 +144,14 @@
 ;; ==================================================
 ;; Global customization options
 
-;; None so far - But see individual other modules and docs for other
+(defcustom moin-double-line-break-p t
+  "Set to t to enable that whenever you hit enter outside of tables,
+two instead of just one line break is added. This ensures that you
+have a real MoinMoin line break, because MoinMoin interpretes a single
+newline as space and not as line break."
+  :group 'moin)
+
+;; See also individual other modules and docs for other
 ;; options
 
 ;; ==================================================
@@ -173,7 +180,7 @@
   ;; Inserting new elements
   (define-key moin-mode-map (kbd "M-<return>") 'moin-command-meta-return)
   (define-key moin-mode-map (kbd "C-<return>") 'moin-command-insert-heading-respect-content)
-  (define-key moin-mode-map (kbd "<return>") 'moin-command-table-next-row)
+  (define-key moin-mode-map (kbd "<return>") 'moin-command-return)
   (define-key moin-mode-map (kbd "S-<return>") 'moin-command-table-copy-down)
   
   ;; Moving in tables or Outline cycle (a.k.a. visibility cycling)
@@ -489,7 +496,7 @@ on the context:
       (moin--heading-insert))))
 
 
-(defun moin-command-insert-heading-respect-content ()
+(defun moin-command-insert-heading-respect-content()
   "Inserts a new heading with the same level of the current heading,
 right after the subtree of the current heading. This also works when
 only in the body of a heading's section. If point is on the heading
@@ -504,19 +511,27 @@ heading line of level 1."
   (moin--heading-insert-respect-content))
 
 
-(defun moin-command-table-next-row ()
+(defun moin-command-return()
   "When in a table, moves to the next row. If there is no next row,
 this command creates a new row. For both the current as well as the
-field below this command moves to, it ensures that - after moving to
-the next field - there is just exactly one blank after the previous
-and before the next column separator. On the end or start of a line,
-it still does NEWLINE and thus can be used to split a table. The same
-is true if the command is used outside of a table. This ensures that
-the default keybinding to RET works as expected."
+field below where this command moves to, it ensures that - after
+moving to the next field - there is just exactly one blank after the
+previous and before the next column separator. On the end or start of
+a line, it still does a line break and thus can be used to split a
+table. If not within a table, this command inserts two line breaks
+instead of just one, in case that `moin-double-line-break-p' is t.
+This feature was especially added for moin-mode to ensure a line break
+is also shown as this in MoinMoin itself. MoinMoin interpretes a
+single newline as a space and only two newlines is displayed as a line
+break. If you do not like this behavior, set
+`moin-double-line-break-p' to nil."
   (interactive)
   (if (moin-is-in-table-p)
       (moin--table-next-row "BASIC")
-    ;; else: Not in table, simply newline
+    
+    (if moin-double-line-break-p
+	(newline))
+    
     (newline)))
 
 

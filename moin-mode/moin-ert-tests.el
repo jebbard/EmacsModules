@@ -955,42 +955,66 @@ Expectations are given in the list form (current-column (start-point end-point c
 
 
 (ert-deftest test-moin--table-next-row ()
-  "Tests `moin-command-table-next-row'"
+  "Tests `moin-command-return' in tables"
   ;; Moves to the next field and fixes previous and target field
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "|| ab ||\n|| xy ||" 5 13 "|| ab ||\n|| xy ||")
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "|| ||\n|| ||" 4 11 "||  ||\n||  ||")
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "|| abc||def ||\n|| || gef||\nAny Text" 12 23
       "|| abc|| def ||\n|| || gef ||\nAny Text")
   ;; Inserts a new table row
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "||      ab ||    ||\n||||||" 23 33
       "||      ab ||    ||\n||  ||||\n||  ||  ||\n")
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "||      ab ||    ||\nAny other text" 3 19
       "|| ab ||    ||\n||  ||  ||\nAny other text")
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "||      ab ||    ||\nAny other text" 15 26
       "||      ab ||  ||\n||  ||  ||\nAny other text")
   ;; Inserts a newline when issued at start or end of line
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "|| ab ||\n|| xy ||" 1 2 "\n|| ab ||\n|| xy ||")
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "|| ab ||\n|| xy ||" 9 10 "|| ab ||\n\n|| xy ||")
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "|| ab ||\n|| xy ||" 10 11 "|| ab ||\n\n|| xy ||")
   ;; Check with active region
-  (check-func-at-point 'moin-command-table-next-row
+  (check-func-at-point 'moin-command-return
       "|| abc||def ||\n|| || gef||\nAny Text" 10 23
       "|| abc|| def ||\n|| || gef ||\nAny Text" 2))
 
 
+(ert-deftest test-moin-command-return-double ()
+  "Tests `moin-command-return' outside of tables, in case
+`moin-double-line-break-p' is t."
+  (setq moin-double-line-break-p t)
+  (check-func-at-point 'moin-command-return
+      "" 1 3 "\n\n")
+  (check-func-at-point 'moin-command-return
+      "Hallo" 3 5 "Ha\n\nllo")
+  (check-func-at-point 'moin-command-return
+      "Hallo" 6 8 "Hallo\n\n"))
+
+
+(ert-deftest test-moin-command-return-single ()
+  "Tests `moin-command-return' outside of tables, in case
+`moin-double-line-break-p' is nil."
+  (setq moin-double-line-break-p nil)
+  (check-func-at-point 'moin-command-return
+      "" 1 2 "\n")
+  (check-func-at-point 'moin-command-return
+      "Hallo" 3 4 "Ha\nllo")
+  (check-func-at-point 'moin-command-return
+      "Hallo" 6 7 "Hallo\n"))
+
+
 (ert-deftest test-moin--table-next-row-error ()
-  "Tests `moin-command-table-next-row' in error situations"
+  "Tests `moin-command-return' in error situations"
   (check-func-at-point-throws-error
-   'moin-command-table-next-row "|| abc||def ||\n|| ||" 10 'user-error))
+   'moin-command-return "|| abc||def ||\n|| ||" 10 'user-error))
 
 
 (ert-deftest test-moin--table-copy-down ()
